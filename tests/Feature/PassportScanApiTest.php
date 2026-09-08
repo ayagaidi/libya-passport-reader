@@ -9,9 +9,9 @@ use Tests\TestCase;
 
 final class PassportScanApiTest extends TestCase
 {
-    private const LINE_1 = 'P<LBYALGAIDI<<AYA<<<<<<<<<<<<<<<<<<<<<<<<<<<';
+    public const LINE_1 = 'P<LBYALGAIDI<<AYA<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-    private const LINE_2 = '1234567897LBY9501016F3001019<<<<<<<<<<<<<<02';
+    public const LINE_2 = '1234567897LBY9501016F3001019<<<<<<<<<<<<<<02';
 
     public function test_it_scans_an_uploaded_image_without_persisting_the_document(): void
     {
