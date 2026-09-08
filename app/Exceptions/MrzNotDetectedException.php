@@ -4,6 +4,4 @@ namespace App\Exceptions;
 
 use RuntimeException;
 
-final class MrzNotDetectedException extends RuntimeException
-{
-}
+final class MrzNotDetectedException extends RuntimeException {}
