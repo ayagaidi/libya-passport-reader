@@ -1,0 +1,60 @@
+openapi: 3.1.0
+info:
+  title: Libya Passport Reader API
+  version: 0.1.0-dev
+  description: Privacy-first API for parsing and validating ICAO Doc 9303 TD3 passport MRZ data.
+servers:
+  - url: http://localhost:8000
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+  /api/v1/meta:
+    get:
+      summary: API metadata and privacy guarantees
+      responses:
+        '200':
+          description: Metadata
+  /api/v1/passport/mrz/parse:
+    post:
+      summary: Parse a two-line TD3 MRZ
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MrzRequest'
+      responses:
+        '200':
+          description: Parsed passport fields and check-digit validation
+        '422':
+          description: Invalid MRZ input
+  /api/v1/passport/mrz/validate:
+    post:
+      summary: Validate TD3 MRZ check digits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MrzRequest'
+      responses:
+        '200':
+          description: Check-digit validation result
+components:
+  schemas:
+    MrzRequest:
+      type: object
+      required: [line1, line2]
+      properties:
+        line1:
+          type: string
+          minLength: 44
+          maxLength: 44
+        line2:
+          type: string
+          minLength: 44
+          maxLength: 44

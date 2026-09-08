@@ -1,0 +1,38 @@
+{
+  "name": "ayagaidi/libya-passport-reader",
+  "type": "project",
+  "description": "Privacy-first Laravel API for parsing and validating passport TD3 MRZ data, with a Libya-focused developer experience.",
+  "keywords": ["libya", "passport", "mrz", "icao-9303", "laravel", "api", "ocr"],
+  "license": "MIT",
+  "require": {
+    "php": "^8.3",
+    "laravel/framework": "^13.17"
+  },
+  "require-dev": {
+    "fakerphp/faker": "^1.23",
+    "laravel/pint": "^1.27",
+    "mockery/mockery": "^1.6",
+    "nunomaduro/collision": "^8.6",
+    "phpunit/phpunit": "^12.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "app/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "post-autoload-dump": [
+      "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+      "@php artisan package:discover --ansi"
+    ],
+    "test": "@php artisan test",
+    "lint": "pint --test"
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
