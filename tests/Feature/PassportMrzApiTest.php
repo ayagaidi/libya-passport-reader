@@ -7,6 +7,7 @@ use Tests\TestCase;
 class PassportMrzApiTest extends TestCase
 {
     private const LINE_1 = 'P<LBYALGAIDI<<AYA<<<<<<<<<<<<<<<<<<<<<<<<<<<';
+
     private const LINE_2 = '1234567897LBY9501016F3001019<<<<<<<<<<<<<<02';
 
     public function test_it_parses_a_valid_td3_mrz(): void
