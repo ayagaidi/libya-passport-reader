@@ -20,6 +20,9 @@ return [
     'exposed_headers' => [
         'X-RateLimit-Limit',
         'X-RateLimit-Remaining',
+        'X-RateLimit-Scope',
+        'X-Demo-Global-RateLimit-Limit',
+        'X-Demo-Global-RateLimit-Remaining',
         'Retry-After',
     ],
     'max_age' => 600,
