@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import cv2
 import numpy as np
 
-from tools import passport_vision
+from tools import mrz_band_preprocess, passport_vision
 
 
 def quality_args(**overrides):
@@ -89,6 +89,43 @@ class PassportVisionTest(unittest.TestCase):
         quality = passport_vision.quality_metrics(cropped, quality_args())
         self.assertNotEqual("rejected", quality["status"])
         self.assertLess(quality["overexposure_ratio"], 0.95)
+
+    def test_adaptive_mrz_preprocessing_recovers_low_contrast_text_band(self):
+        image = np.full((700, 1400, 3), 238, dtype=np.uint8)
+        cv2.putText(
+            image,
+            "P<LBYTEST<<AYA<ABDULHAKIM<MASOUD<<<<",
+            (80, 565),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1.25,
+            (175, 175, 175),
+            2,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            image,
+            "AA076550<7LBY9503283F2706188<<<<<<<<0",
+            (80, 625),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1.25,
+            (175, 175, 175),
+            2,
+            cv2.LINE_AA,
+        )
+
+        processed = mrz_band_preprocess.preprocess_mrz_band(
+            image,
+            start_ratio=0.60,
+            target_width=2800,
+            block_size=41,
+            constant=15,
+        )
+
+        self.assertIsNotNone(processed)
+        self.assertEqual(2800, processed.shape[1])
+        self.assertEqual(np.uint8, processed.dtype)
+        self.assertLess(int(processed.min()), 255)
+        self.assertEqual(255, int(processed.max()))
 
 
 if __name__ == "__main__":
