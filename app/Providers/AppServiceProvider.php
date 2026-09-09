@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Services\CivilRegistry\CivilRegistryOcrEngine;
+use App\Services\CivilRegistry\CivilRegistryOcrEngineInterface;
 use App\Services\Passport\Ocr\OcrEngineInterface;
 use App\Services\Passport\Ocr\TesseractOcrEngine;
 use App\Services\Passport\SmartScanner\ImageMagickSmartPassportImageProcessor;
@@ -18,6 +20,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(OcrEngineInterface::class, TesseractOcrEngine::class);
         $this->app->bind(VisualZoneOcrEngineInterface::class, TesseractVisualZoneOcrEngine::class);
+        $this->app->bind(CivilRegistryOcrEngineInterface::class, CivilRegistryOcrEngine::class);
         $this->app->bind(SmartPassportImageProcessorInterface::class, ImageMagickSmartPassportImageProcessor::class);
         $this->app->bind(VisionPassportImageProcessorInterface::class, OpenCvVisionPassportImageProcessor::class);
     }
