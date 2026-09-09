@@ -54,6 +54,8 @@ final class PassportScanApiTest extends TestCase
             ->assertJsonPath('data.passport.data.surname', 'ALGAIDI')
             ->assertJsonPath('data.scan.mrz_detected', true)
             ->assertJsonPath('data.scan.ocr_engine', 'fake-test-engine')
+            ->assertJsonPath('data.scan.smart_scanner.strategy', 'full_image_fallback')
+            ->assertJsonPath('data.scan.smart_scanner.region_detection_applied', false)
             ->assertJsonPath('data.privacy.stores_passport_images', false)
             ->assertJsonPath('data.privacy.temporary_files_deleted', true)
             ->assertJsonPath('meta.document_authenticity_verified', false);
