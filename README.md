@@ -6,9 +6,28 @@ Libya Passport Reader is an independent open-source developer project focused on
 
 > This is not an official Libyan government service and is not presented as being approved, endorsed, or affiliated with Libyan passport authorities. A mathematically valid MRZ or a visual-zone match is not proof that a passport is genuine.
 
-## v0.3 visual-zone OCR
+## v0.3.1 Smart Passport Scanner
 
-v0.3 extends the privacy-first v0.2 scanner with a second OCR pass for visible passport fields.
+v0.3.1 adds a privacy-first smart preprocessing stage before OCR.
+
+- configurable ImageMagick preprocessing
+- automatic EXIF orientation correction
+- grayscale normalization
+- deskew
+- contrast stretch and sharpening
+- bounded image resizing
+- configurable TD3 MRZ-region crop
+- configurable visual-zone crop
+- MRZ OCR runs on the MRZ-focused region instead of the full image when preprocessing succeeds
+- Arabic/English visual OCR runs on the visual-zone region
+- graceful full-image fallback when ImageMagick is unavailable or preprocessing fails
+- real Tesseract TSV confidence for visual OCR lines and extracted fields
+- OCR line bounding boxes kept in-process for extraction metadata but not returned as raw OCR text
+- all generated normalized/cropped files are private temporary files and are deleted before the request returns
+
+The region detector in v0.3.1 is a conservative, configurable **TD3 layout heuristic**, not a claim of computer-vision passport authentication. Perspective correction from detected document corners remains a later enhancement.
+
+## Existing scanner capabilities
 
 - TD3 MRZ parsing and ICAO check-digit validation
 - image upload from camera/gallery (`JPEG`, `PNG`, `WebP`)
@@ -19,7 +38,6 @@ v0.3 extends the privacy-first v0.2 scanner with a second OCR pass for visible p
 - labeled-field extraction for names, passport number, nationality, dates, sex, place of birth, issue date, and issuing place
 - comparison of MRZ-backed visual fields against parsed MRZ data
 - `match`, `mismatch`, `not_detected`, and `not_comparable` reporting
-- confidence metadata for extracted labeled fields
 - visual-only fields kept separate when the MRZ has no equivalent
 - structured JSON output
 - private temporary processing with immediate cleanup
@@ -48,47 +66,30 @@ curl -X POST http://localhost:8000/api/v1/passport/scan \
 
 A mobile or Flutter camera can send the captured frame to the same endpoint.
 
-The response contains parsed MRZ fields, ICAO check-digit validation, OCR-engine metadata, extracted visual-zone fields, MRZ/visual comparisons, and privacy metadata. It does **not** return raw OCR text and it does not claim passport authenticity verification.
+The response contains parsed MRZ fields, ICAO validation, smart-scanner metadata, OCR-engine metadata, extracted visual-zone fields, MRZ/visual comparisons, and privacy metadata. It does **not** return raw OCR text and it does not claim passport authenticity verification.
 
-Example response shape:
+Example smart-scanner metadata:
 
 ```json
 {
-  "data": {
-    "passport": {
-      "document_format": "TD3",
-      "data": {},
-      "validation": {}
-    },
-    "scan": {
-      "mrz_detected": true,
-      "ocr_engine": "tesseract"
-    },
-    "visual_zone": {
-      "status": "processed",
-      "ocr_engine": "tesseract-visual:eng+ara",
-      "fields": {},
-      "visual_only_fields": {},
-      "comparison": {
-        "status": "consistent",
-        "matches": 0,
-        "mismatches": 0,
-        "fields": {}
+  "scan": {
+    "mrz_detected": true,
+    "smart_scanner": {
+      "strategy": "imagemagick_layout_regions",
+      "region_detection_applied": true,
+      "preprocessing": {
+        "auto_orient": true,
+        "grayscale": true,
+        "deskew": true,
+        "contrast_stretch": true,
+        "sharpen": true
       }
-    },
-    "privacy": {
-      "stores_passport_images": false,
-      "stores_passport_data": false,
-      "returns_raw_ocr_text": false,
-      "temporary_files_deleted": true
     }
-  },
-  "meta": {
-    "standard": "ICAO Doc 9303 TD3",
-    "document_authenticity_verified": false
   }
 }
 ```
+
+If smart preprocessing cannot be used, the API reports `full_image_fallback` and continues with the v0.3 behavior.
 
 ### Parse MRZ text directly
 
@@ -129,24 +130,26 @@ cp .env.example .env
 php artisan key:generate
 ```
 
-### 2. OCR dependencies
+### 2. OCR and smart-scanner dependencies
 
 macOS with Homebrew:
 
 ```bash
-brew install tesseract tesseract-lang poppler
+brew install tesseract tesseract-lang poppler imagemagick
 ```
 
 Ubuntu/Debian:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y tesseract-ocr tesseract-ocr-ara poppler-utils
+sudo apt-get install -y tesseract-ocr tesseract-ocr-ara poppler-utils imagemagick
 ```
 
 `poppler-utils` provides `pdftoppm`, which is used only when the uploaded input is a PDF.
 
 The visual-zone scanner defaults to `eng+ara`. If Arabic language data is unavailable, it can fall back to English using `PASSPORT_VISUAL_OCR_FALLBACK_LANGUAGE=eng`.
+
+The smart scanner defaults to the ImageMagick 7 executable `magick`. On systems using another compatible executable, set `PASSPORT_IMAGEMAGICK_BINARY` accordingly. The feature can be disabled with `PASSPORT_SMART_SCANNER_ENABLED=false`.
 
 ### 3. Run
 
@@ -163,11 +166,12 @@ For `/passport/scan` the server:
 1. accepts the upload after MIME and size validation;
 2. copies it to a randomly named private temporary path with restrictive permissions;
 3. rasterizes only page 1 when the input is a PDF;
-4. runs local OCR and detects TD3 MRZ candidates;
-5. parses and validates the MRZ;
-6. optionally runs Arabic/English visual-zone OCR on the same temporary raster;
-7. extracts labeled visual fields and compares MRZ-backed fields;
-8. deletes every temporary source/raster file in a `finally` block before returning the response.
+4. optionally normalizes the image and creates temporary MRZ/visual-zone crops;
+5. runs local OCR on the MRZ-focused region and detects TD3 candidates;
+6. parses and validates the MRZ;
+7. optionally runs Arabic/English visual-zone OCR on the visual crop;
+8. extracts labeled visual fields and compares MRZ-backed fields;
+9. deletes the upload, PDF raster, normalized image, and all region crops in a `finally` block before returning the response.
 
 The application does not create passport database records. Full MRZ strings and raw OCR output must not be written to logs.
 
@@ -196,10 +200,10 @@ A successful comparison means the OCR-visible value and MRZ value are consistent
 ## Roadmap
 
 ### v0.3.x
-- visual-region detection/cropping before visible-field OCR
-- deskew, contrast, and mobile-photo preprocessing
-- improved per-field confidence from OCR word boxes
-- configurable passport-layout profiles without hard-coded official assumptions
+- detected document-corner geometry and perspective correction
+- stronger glare/shadow and blur handling
+- layout-profile calibration using private synthetic/redacted evaluation data
+- confidence thresholds and optional low-confidence field suppression
 
 ### Later
 - Flutter live camera scanner
