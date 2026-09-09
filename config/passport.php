@@ -12,6 +12,17 @@ return [
         'timeout' => (int) env('PASSPORT_OCR_TIMEOUT', 20),
     ],
 
+    'smart_scanner' => [
+        'enabled' => (bool) env('PASSPORT_SMART_SCANNER_ENABLED', true),
+        'imagemagick_binary' => env('PASSPORT_IMAGEMAGICK_BINARY', 'magick'),
+        'timeout' => (int) env('PASSPORT_SMART_SCANNER_TIMEOUT', 15),
+        'max_dimension' => (int) env('PASSPORT_SMART_SCANNER_MAX_DIMENSION', 2600),
+        'deskew_threshold' => env('PASSPORT_SMART_SCANNER_DESKEW', '40%'),
+        'contrast_stretch' => env('PASSPORT_SMART_SCANNER_CONTRAST', '1%x1%'),
+        'mrz_start_ratio' => (float) env('PASSPORT_SMART_SCANNER_MRZ_START', 0.62),
+        'visual_end_ratio' => (float) env('PASSPORT_SMART_SCANNER_VISUAL_END', 0.78),
+    ],
+
     'visual_zone' => [
         'enabled' => (bool) env('PASSPORT_VISUAL_ZONE_ENABLED', true),
         'language' => env('PASSPORT_VISUAL_OCR_LANGUAGE', 'eng+ara'),
