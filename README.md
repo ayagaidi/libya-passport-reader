@@ -1,5 +1,7 @@
 # Libya Document Reader 🇱🇾
 
+**English** | [العربية](README_AR.md)
+
 **Privacy-first Laravel API for reading Libyan passports and supported Civil Registry Authority documents from images and PDF scans.**
 
 Libya Document Reader is an independent open-source developer project. It combines local OCR, computer vision, ICAO TD3 MRZ validation, structured Arabic/English extraction, and conservative document-verification signals without claiming official document authenticity.
