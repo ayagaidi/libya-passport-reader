@@ -18,7 +18,7 @@ final class VisualZoneFieldExtractor
         'issuing_place' => ['Issuing authority', 'Issuing place', 'Place of issue', 'جهة الإصدار', 'مكان الإصدار'],
     ];
 
-    public function extract(string $text): array
+    public function extract(string $text, array $lineMetadata = []): array
     {
         $lines = array_values(array_filter(
             array_map(static fn (string $line): string => trim($line), preg_split('/\R/u', $text) ?: []),
@@ -35,11 +35,11 @@ final class VisualZoneFieldExtractor
             }
 
             $value = $this->valueWithoutLabels($line, self::LABELS[$field]);
-            $confidence = 0.90;
+            $confidence = $this->lineConfidence($lineMetadata, $index, 0.90);
 
             if ($value === '' && isset($lines[$index + 1]) && $this->detectField($lines[$index + 1]) === null) {
                 $value = $this->cleanValue($lines[$index + 1]);
-                $confidence = 0.78;
+                $confidence = $this->lineConfidence($lineMetadata, $index + 1, 0.78);
             }
 
             if ($value === '') {
@@ -110,5 +110,16 @@ final class VisualZoneFieldExtractor
         usort($labels, static fn (string $a, string $b): int => mb_strlen($b, 'UTF-8') <=> mb_strlen($a, 'UTF-8'));
 
         return $labels;
+    }
+
+    private function lineConfidence(array $lineMetadata, int $index, float $fallback): float
+    {
+        $confidence = $lineMetadata[$index]['confidence'] ?? null;
+
+        if (! is_numeric($confidence)) {
+            return $fallback;
+        }
+
+        return max(0.0, min(1.0, (float) $confidence));
     }
 }
