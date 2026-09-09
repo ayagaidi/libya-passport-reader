@@ -8,7 +8,7 @@ use App\Services\Passport\VisualZone\TesseractTsvParser;
 use Symfony\Component\Process\Process;
 use Throwable;
 
-final class CivilRegistryOcrEngine
+final class CivilRegistryOcrEngine implements CivilRegistryOcrEngineInterface
 {
     public function __construct(private readonly TesseractTsvParser $tsvParser) {}
 
