@@ -1,4 +1,4 @@
-FROM docker.swagger.io/swaggerapi/swagger-ui:v5.32.15 AS swagger-ui
+FROM swaggerapi/swagger-ui:v5.32.15 AS swagger-ui
 
 FROM php:8.3-cli-bookworm
 
