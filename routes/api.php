@@ -3,13 +3,23 @@
 use App\Http\Controllers\Api\V1\CivilRegistryScanController;
 use App\Http\Controllers\Api\V1\PassportMrzController;
 use App\Http\Controllers\Api\V1\PassportScanController;
+use App\Http\Middleware\AuthenticateDocumentApiKey;
+use App\Http\Middleware\ThrottleDocumentApiClient;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1')->middleware('throttle:'.env('PASSPORT_API_RATE_LIMIT', 60).',1')->group(function (): void {
+Route::prefix('v1')->middleware([
+    AuthenticateDocumentApiKey::class,
+    ThrottleDocumentApiClient::class,
+])->group(function (): void {
     Route::get('/meta', fn () => response()->json([
         'name' => 'Libya Document Reader',
-        'version' => '0.4.1-dev',
-        'scope' => 'Vision-corrected passport and Libyan Civil Registry Authority document scanning with bilingual OCR, structured extraction, and conservative verification signals',
+        'version' => '0.4.2-dev',
+        'scope' => 'Production-hardened passport and Libyan Civil Registry Authority document scanning with bilingual OCR, structured extraction, conservative verification signals, API-key authentication, and per-client rate limiting',
+        'security' => [
+            'api_key_required' => (bool) config('document_api.enabled', false),
+            'api_key_header' => (string) config('document_api.header', 'X-API-Key'),
+            'rate_limit_scope' => 'per API client',
+        ],
         'privacy' => [
             'stores_document_images' => false,
             'stores_document_data' => false,
