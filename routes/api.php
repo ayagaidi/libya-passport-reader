@@ -7,12 +7,16 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->middleware('throttle:'.env('PASSPORT_API_RATE_LIMIT', 60).',1')->group(function (): void {
     Route::get('/meta', fn () => response()->json([
         'name' => 'Libya Passport Reader',
-        'version' => '0.3.0-dev',
-        'scope' => 'Passport TD3 MRZ parsing, validation, privacy-first OCR scanning, bilingual visual-zone extraction, and MRZ comparison',
+        'version' => '0.3.1-dev',
+        'scope' => 'Smart passport preprocessing, TD3 MRZ parsing and validation, bilingual visual-zone extraction, and MRZ comparison',
         'privacy' => [
             'stores_passport_images' => false,
             'stores_passport_data' => false,
             'returns_raw_ocr_text' => false,
+        ],
+        'smart_scanner' => [
+            'preprocessing' => ['auto_orient', 'grayscale', 'deskew', 'contrast_stretch', 'sharpen'],
+            'region_strategy' => 'configurable TD3 layout regions with full-image fallback',
         ],
         'visual_zone' => [
             'languages' => ['en', 'ar'],
