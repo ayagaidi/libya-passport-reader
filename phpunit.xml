@@ -18,6 +18,7 @@
         <env name="SESSION_DRIVER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="LOG_CHANNEL" value="null"/>
+        <env name="DOCUMENT_API_AUTH_ENABLED" value="false"/>
         <env name="PASSPORT_VISUAL_ZONE_ENABLED" value="false"/>
         <env name="PASSPORT_SMART_SCANNER_ENABLED" value="false"/>
         <env name="PASSPORT_VISION_ENABLED" value="false"/>
