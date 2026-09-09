@@ -11,11 +11,11 @@ use PHPUnit\Framework\TestCase;
 
 final class AdaptiveMrzScannerTest extends TestCase
 {
-    private const LINE_1 = 'P<LBYALGAIDI<<AYA<<<<<<<<<<<<<<<<<<<<<<<<<<<';
+    public const LINE_1 = 'P<LBYALGAIDI<<AYA<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-    private const STRONG_LINE_2 = '1234567897LBY9501016F3001019<<<<<<<<<<<<<<02';
+    public const STRONG_LINE_2 = '1234567897LBY9501016F3001019<<<<<<<<<<<<<<02';
 
-    private const WEAK_LINE_2 = '1234567897LBY9501010F3001010<<<<<<<<<<<<<<00';
+    public const WEAK_LINE_2 = '1234567897LBY9501010F3001010<<<<<<<<<<<<<<00';
 
     public function test_it_selects_the_candidate_with_the_strongest_icao_detection_score(): void
     {
