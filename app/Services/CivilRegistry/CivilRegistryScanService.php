@@ -13,7 +13,7 @@ final class CivilRegistryScanService
         private readonly TemporaryPassportFileManager $temporaryFiles,
         private readonly PassportDocumentPreparer $documentPreparer,
         private readonly VisionPassportImageProcessorInterface $visionImageProcessor,
-        private readonly CivilRegistryOcrEngine $ocr,
+        private readonly CivilRegistryOcrEngineInterface $ocr,
         private readonly CivilRegistryDocumentClassifier $classifier,
         private readonly CivilRegistryFieldExtractor $extractor,
     ) {}
