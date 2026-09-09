@@ -11,6 +11,13 @@ final class MrzTextExtractor
 
     public function extract(string $text): array
     {
+        $result = $this->detect($text);
+
+        return [$result['line1'], $result['line2']];
+    }
+
+    public function detect(string $text): array
+    {
         $lines = preg_split('/\R/u', strtoupper($text)) ?: [];
         $candidates = [];
 
@@ -22,17 +29,23 @@ final class MrzTextExtractor
             }
         }
 
-        $line1 = $this->bestLine1($candidates);
-        $line2 = $this->bestLine2($candidates, $line1);
+        [$line1, $line1Score] = $this->bestLine1($candidates);
+        [$line2, $line2Score] = $this->bestLine2($candidates, $line1);
 
         if ($line1 === null || $line2 === null) {
             throw new MrzNotDetectedException('No TD3 MRZ could be confidently detected in the OCR output.');
         }
 
-        return [$line1, $line2];
+        return [
+            'line1' => $line1,
+            'line2' => $line2,
+            'score' => $line1Score + $line2Score,
+            'line1_score' => $line1Score,
+            'line2_score' => $line2Score,
+        ];
     }
 
-    private function bestLine1(array $candidates): ?string
+    private function bestLine1(array $candidates): array
     {
         $best = null;
         $bestScore = -1;
@@ -60,10 +73,10 @@ final class MrzTextExtractor
             }
         }
 
-        return $bestScore >= 10 ? $best : null;
+        return $bestScore >= 10 ? [$best, $bestScore] : [null, $bestScore];
     }
 
-    private function bestLine2(array $candidates, ?string $line1): ?string
+    private function bestLine2(array $candidates, ?string $line1): array
     {
         $best = null;
         $bestScore = -1;
@@ -83,7 +96,7 @@ final class MrzTextExtractor
             }
         }
 
-        return $bestScore >= 8 ? $best : null;
+        return $bestScore >= 8 ? [$best, $bestScore] : [null, $bestScore];
     }
 
     private function scoreLine2(string $line): int
