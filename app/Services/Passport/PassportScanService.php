@@ -2,9 +2,11 @@
 
 namespace App\Services\Passport;
 
+use App\Exceptions\LowQualityPassportImageException;
 use App\Exceptions\ScannerDependencyException;
 use App\Services\Passport\SmartScanner\AdaptiveMrzScanner;
 use App\Services\Passport\SmartScanner\SmartPassportImageProcessorInterface;
+use App\Services\Passport\Vision\VisionPassportImageProcessorInterface;
 use App\Services\Passport\VisualZone\PassportVisualZoneComparator;
 use App\Services\Passport\VisualZone\VisualZoneFieldExtractor;
 use App\Services\Passport\VisualZone\VisualZoneOcrEngineInterface;
@@ -15,6 +17,7 @@ final class PassportScanService
     public function __construct(
         private readonly TemporaryPassportFileManager $temporaryFiles,
         private readonly PassportDocumentPreparer $documentPreparer,
+        private readonly VisionPassportImageProcessorInterface $visionImageProcessor,
         private readonly SmartPassportImageProcessorInterface $smartImageProcessor,
         private readonly AdaptiveMrzScanner $adaptiveMrzScanner,
         private readonly MrzParserService $mrzParser,
@@ -39,7 +42,15 @@ final class PassportScanService
                 $paths[] = $imagePath;
             }
 
-            $smartImage = $this->smartImageProcessor->prepare($imagePath);
+            $visionImage = $this->visionImageProcessor->prepare($imagePath);
+            $paths = array_merge($paths, $visionImage->temporaryPaths);
+
+            if (($visionImage->quality['status'] ?? null) === 'rejected'
+                && config('passport.vision.reject_low_quality', true)) {
+                throw new LowQualityPassportImageException($visionImage->quality);
+            }
+
+            $smartImage = $this->smartImageProcessor->prepare($visionImage->imagePath);
             $paths = array_merge($paths, $smartImage->temporaryPaths);
             $candidatePaths = $smartImage->mrzCandidatePaths !== []
                 ? $smartImage->mrzCandidatePaths
@@ -55,6 +66,13 @@ final class PassportScanService
                     'ocr_engine' => $ocrResult->engine,
                     'ocr_confidence' => $ocrResult->confidence,
                     'source_type' => $mimeType === 'application/pdf' ? 'pdf' : 'image',
+                    'vision' => [
+                        'strategy' => $visionImage->strategy,
+                        'document_detected' => $visionImage->documentDetected,
+                        'perspective_corrected' => $visionImage->perspectiveCorrected,
+                        'quality' => $visionImage->quality,
+                        'diagnostics' => $visionImage->diagnostics,
+                    ],
                     'smart_scanner' => [
                         'strategy' => $smartImage->strategy,
                         'region_detection_applied' => $smartImage->strategy !== 'full_image_fallback',
