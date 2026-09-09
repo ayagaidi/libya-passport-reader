@@ -1,58 +1,91 @@
-# Libya Passport Reader 🇱🇾
+# Libya Document Reader 🇱🇾
 
-**Privacy-first Laravel API for reading and validating passport MRZ data from text, images, and PDF scans.**
+**Privacy-first Laravel API for reading Libyan passports and supported Civil Registry Authority documents from images and PDF scans.**
 
-Libya Passport Reader is an independent open-source developer project focused on ICAO Doc 9303 TD3 passports. It combines local OCR, conservative MRZ validation, bilingual visible-field extraction, and a privacy-first computer-vision pipeline without claiming document authenticity.
+Libya Document Reader is an independent open-source developer project. It combines local OCR, computer vision, ICAO TD3 MRZ validation, structured Arabic/English extraction, and conservative document-verification signals without claiming official document authenticity.
 
-> This is not an official Libyan government service and is not approved, endorsed, or affiliated with Libyan passport authorities. A valid MRZ, corrected document image, or visual-zone match is not proof that a passport is genuine.
+> This is not an official Libyan government service and is not approved, endorsed, or affiliated with Libyan passport or Civil Registry authorities. OCR, MRZ validation, QR presence, template consistency, or detected seals are not proof that a document is genuine.
+
+## v0.4.1 Civil Registry Verification Signals
+
+v0.4.1 extends the Civil Registry reader with advisory verification signals:
+
+- QR detection using OpenCV
+- local QR decoding when image quality allows it
+- structural validation of recognized `CheckNumber:<UUID>` payloads
+- QR position consistency for the currently supported sample layouts
+- blue-ink seal/stamp candidate detection
+- normalized seal candidate positions without returning image crops
+- sample-calibrated template-anchor coverage
+- field-format consistency checks for national numbers and dates
+- aggregate `signal_score`
+- statuses: `signals_consistent`, `partial_signals`, `review_recommended`, or `insufficient_evidence`
+- no issuer URL is called automatically
+- no raw QR payload is returned
+- `authenticity_verified` always remains `false` without a future trusted issuer integration
+
+The currently supported Civil Registry layouts are:
+
+- Residence Certificate — **شهادة الإقامة**
+- Family Status Certificate — **شهادة بالوضع العائلي**
+
+Template checks are calibrated from supported sample layouts and are deliberately not presented as an official template certification.
+
+## v0.4 Civil Registry Reader
+
+Civil Registry scans use dedicated Arabic/English Tesseract OCR with multiple page-segmentation candidates (`PSM 4`, `3`, and `11`). The strongest OCR candidate is selected conservatively and useful lines are merged for extraction.
+
+Civil Registry OCR and verification use the **complete prepared page** so portrait headers, QR blocks, and table headings are not lost to passport-oriented crops. Passport vision output is still available as diagnostic metadata but is not applied to Civil Registry OCR.
+
+Family Status Certificate extraction can return detected family-member rows with fields such as:
+
+- national number
+- name
+- relationship
+- date of birth
+
+Residence Certificate extraction can return detected fields such as:
+
+- national number
+- family registry number
+- family sheet number
+- person name
+- father name
+- mother name
+- date of birth
+- profession
+- address
+- registered-since date
+
+Fields are returned only when the local OCR/extractor detects them; missing fields are not invented.
 
 ## v0.3.3 Vision Passport Scanner
 
-v0.3.3 adds a real computer-vision stage before the existing adaptive OCR pipeline.
+The passport scanner includes:
 
 - OpenCV contour-based document detection
-- best-quadrilateral selection from detected page boundaries
-- rotated-rectangle fallback for strong rectangular contours
-- four-corner ordering and perspective transform
-- automatic landscape normalization after perspective correction
-- blur quality scoring using Laplacian variance
-- glare/overexposure scoring using clipped low-saturation highlights
-- `accepted`, `warning`, and `rejected` image-quality states
-- configurable hard rejection for severely low-quality frames
-- privacy-safe vision metadata without corner coordinates or temporary paths
-- safe fallback to v0.3.2 when OpenCV is disabled, unavailable, or no document contour is confidently detected
-- synthetic OpenCV tests in a dedicated GitHub Actions job
-
-The vision stage runs before ImageMagick preprocessing. A successfully rectified document is then passed into the existing adaptive MRZ scanner, which still tries multiple MRZ crops and ranks candidates primarily using ICAO structure/check-digit evidence.
-
-## Scanner pipeline
-
-`upload/PDF → document detection → perspective correction → quality gate → smart preprocessing → adaptive MRZ OCR → MRZ validation → Arabic/English visual OCR → MRZ/visual comparison`
-
-Current capabilities include:
-
-- JPEG, PNG, WebP, and first-page PDF scanning
-- local Tesseract OCR
-- TD3 MRZ parsing and ICAO check-digit validation
-- multiple configurable MRZ region candidates
-- ICAO-based MRZ candidate ranking with OCR confidence only as a small tie-breaker
+- four-corner perspective correction
+- landscape normalization for passport pages
+- blur, glare, and overexposure quality scoring
+- ImageMagick normalization and MRZ-region candidates
+- adaptive local-threshold MRZ preprocessing
+- TD3 candidate scoring using ICAO structure/check digits
 - Arabic + English visual-zone OCR
-- real Tesseract TSV confidence for visible-field OCR
-- labeled-field extraction for names, passport number, nationality, dates, sex, place of birth, issue date, and issuing place
-- conservative comparison of visible fields against MRZ data
-- private temporary processing and deterministic cleanup
-- no raw OCR response
-- no passport-image persistence
-- no passport-data persistence
-- OpenAPI 3.1, Laravel tests, and dedicated synthetic vision tests
+- conservative MRZ/visual comparison
 
-Arabic names are **not automatically treated as equal to Latin MRZ transliterations**. They are reported as `not_comparable` unless a safe comparison is possible.
+## Scanner pipelines
 
-The repository and tests use synthetic data only. **Never commit real passport images, MRZ lines, passport numbers, or personal data.**
+Passport:
+
+`upload/PDF → document detection → perspective correction → quality gate → smart preprocessing → adaptive MRZ OCR → ICAO validation → Arabic/English visual OCR → comparison`
+
+Civil Registry:
+
+`upload/PDF → full-page preparation → multi-layout Arabic/English OCR → document classification → structured extraction → QR/seal detection → template/field consistency → verification signals`
 
 ## API
 
-### Scan a passport image or PDF
+### Scan a passport
 
 `POST /api/v1/passport/scan`
 
@@ -62,55 +95,57 @@ curl -X POST http://localhost:8000/api/v1/passport/scan \
   -F 'passport=@passport.jpg'
 ```
 
-A successful response includes vision metadata such as:
+### Scan a Civil Registry document
+
+`POST /api/v1/civil-registry/scan`
+
+```bash
+curl -X POST http://localhost:8000/api/v1/civil-registry/scan \
+  -H 'Accept: application/json' \
+  -F 'document=@civil-registry.pdf'
+```
+
+A successful Civil Registry response can include:
 
 ```json
 {
-  "scan": {
-    "vision": {
-      "strategy": "opencv_document_corners",
-      "document_detected": true,
-      "perspective_corrected": true,
-      "quality": {
-        "status": "accepted",
-        "reasons": [],
-        "blur_score": 143.8,
-        "glare_ratio": 0.021
-      },
-      "diagnostics": {
-        "status": "corrected",
-        "detection_method": "contour_quad",
-        "document_area_ratio": 0.61
-      }
+  "data": {
+    "document": {
+      "type": "residence_certificate",
+      "fields": {}
     },
-    "smart_scanner": {
-      "strategy": "imagemagick_adaptive_regions",
-      "adaptive_mrz": {
-        "enabled": true,
-        "candidate_count": 5,
-        "selected_candidate": 1,
-        "detection_score": 35
+    "verification": {
+      "status": "partial_signals",
+      "signal_score": 0.71,
+      "authenticity_verified": false,
+      "issuer_verification": {
+        "status": "not_configured",
+        "database_checked": false,
+        "digital_signature_verified": false
+      },
+      "qr": {
+        "detected": true,
+        "decoded": true,
+        "payload_format": "civil_registry_check_number",
+        "structure_valid": true,
+        "position_consistent": true,
+        "issuer_lookup_performed": false
+      },
+      "seals": {
+        "detected": true,
+        "candidate_count": 1,
+        "expected_location_match": true
+      },
+      "template": {
+        "status": "consistent",
+        "official_template_verified": false
       }
     }
   }
 }
 ```
 
-No corner coordinates, raw OCR text, or temporary file paths are returned.
-
-A severely blurred or overexposed image can return:
-
-```json
-{
-  "code": "low_image_quality",
-  "quality": {
-    "status": "rejected",
-    "reasons": ["blur"]
-  }
-}
-```
-
-Warnings do not block scanning. Hard rejection is configurable with `PASSPORT_VISION_REJECT_LOW_QUALITY`.
+The example is illustrative and contains no real identity data.
 
 ### Parse MRZ text directly
 
@@ -123,7 +158,7 @@ Warnings do not block scanning. Hard rejection is configurable with `PASSPORT_VI
 }
 ```
 
-The example is fictional/synthetic test data.
+This MRZ is fictional/synthetic test data.
 
 ### Other endpoints
 
@@ -131,6 +166,25 @@ The example is fictional/synthetic test data.
 - `GET /api/v1/meta`
 - `GET /health`
 - `GET /openapi.yaml`
+- Swagger UI: `/docs`
+
+## Privacy
+
+The API is designed to process identity documents transiently:
+
+- uploaded files are copied into random private temporary storage
+- PDF processing rasterizes only the first page
+- OCR runs locally
+- OpenCV and ImageMagick run locally
+- raw OCR text is not returned
+- raw QR payloads are not returned
+- document images are not persisted by the application
+- extracted document data is not persisted by the application
+- all tracked temporary files are deleted in `finally` cleanup before a successful response returns
+
+Never log raw OCR/TSV output, full MRZ strings, QR payloads, passport images, Civil Registry images, or extracted identity fields.
+
+The repository and automated tests use synthetic data only. **Never commit real identity documents or personal data.**
 
 ## Local setup
 
@@ -157,9 +211,7 @@ sudo apt-get update
 sudo apt-get install -y tesseract-ocr tesseract-ocr-ara poppler-utils imagemagick python3 python3-venv
 ```
 
-### 3. OpenCV vision environment
-
-Use an isolated Python environment for the server-side vision worker:
+### 3. OpenCV environment
 
 ```bash
 python3 -m venv .venv-vision
@@ -167,15 +219,20 @@ python3 -m venv .venv-vision
 .venv-vision/bin/python -m pip install -r requirements-vision.txt
 ```
 
-Then configure:
+Configure the worker:
 
 ```env
 PASSPORT_VISION_ENABLED=true
 PASSPORT_VISION_PYTHON_BINARY=/absolute/path/to/project/.venv-vision/bin/python
 PASSPORT_VISION_REJECT_LOW_QUALITY=true
-```
 
-If the vision dependency is unavailable, scanning falls back to the existing privacy-first adaptive scanner instead of failing only because OpenCV is missing.
+CIVIL_REGISTRY_OCR_LANGUAGE=ara+eng
+CIVIL_REGISTRY_OCR_PSMS=4,3,11
+CIVIL_REGISTRY_OCR_TIMEOUT=30
+CIVIL_REGISTRY_VERIFICATION_ENABLED=true
+CIVIL_REGISTRY_VERIFICATION_TIMEOUT=15
+CIVIL_REGISTRY_VERIFICATION_MAX_DIMENSION=2200
+```
 
 ### 4. Run
 
@@ -183,48 +240,43 @@ If the vision dependency is unavailable, scanning falls back to the existing pri
 php artisan serve
 ```
 
-## Quality thresholds
+Open:
 
-The defaults are conservative starting points and should be calibrated against private synthetic/redacted evaluation data for the deployment camera workflow:
+- API: `http://localhost:8000`
+- Swagger: `http://localhost:8000/docs`
 
-```env
-PASSPORT_VISION_MIN_DOCUMENT_AREA=0.20
-PASSPORT_VISION_BLUR_WARNING=75
-PASSPORT_VISION_BLUR_REJECT=35
-PASSPORT_VISION_GLARE_WARNING=0.18
-PASSPORT_VISION_GLARE_REJECT=0.35
-```
+## Verification model
 
-`warning` continues scanning. `rejected` returns HTTP 422 when hard rejection is enabled.
+Civil Registry verification is intentionally split into levels:
 
-## Privacy lifecycle
+1. **Extraction** — OCR and structured fields.
+2. **Structural signals** — national-number/date formats and recognized QR payload format.
+3. **Visual signals** — QR position and seal/stamp candidates.
+4. **Template signals** — expected text anchors for supported sample layouts.
+5. **Issuer verification** — **not implemented** until a trusted official verification source or cryptographic signature mechanism is available.
 
-For `/passport/scan` the server:
+Only level 5 could materially raise the system toward authoritative authenticity verification. The API therefore does not label a document as genuine or forged.
 
-1. validates the upload and copies it to random private temporary storage;
-2. rasterizes only page 1 for PDFs;
-3. optionally detects the document boundary locally with OpenCV;
-4. creates a private perspective-corrected frame when four corners are confidently detected;
-5. computes blur/glare quality metrics locally;
-6. rejects only severe low-quality input when configured to do so;
-7. generates private normalized and MRZ/visual-zone crops;
-8. runs local OCR across adaptive MRZ candidates and selects the strongest ICAO result;
-9. parses/validates MRZ data and compares it with visible Arabic/English fields;
-10. deletes the upload, PDF raster, corrected image, normalized image, and every crop in a `finally` cleanup before returning.
+## Security notes
 
-The application does not create passport database records. Full MRZ strings, raw OCR/TSV output, corrected images, and temporary paths must not be logged.
+- QR payloads are decoded locally and are never automatically opened as URLs.
+- unrecognized QR contents are represented only by a SHA-256 fingerprint, not returned raw
+- external commands are invoked using argument arrays rather than shell interpolation
+- seal detection uses image features only and cannot prove who applied a stamp
+- template profiles are sample-calibrated, not official government schemas
 
 See [SECURITY.md](SECURITY.md).
 
 ## Roadmap
 
-### v0.3.x
+### v0.4.x
 
-- stronger shadow and localized glare correction
-- private camera/layout calibration tooling
-- optional low-confidence visible-field suppression
-- capture guidance metadata for mobile clients
-- benchmark reporting from synthetic/redacted evaluation sets
+- improve Arabic table-row reconstruction
+- add confidence-based field suppression
+- add more Civil Registry layouts only from safe synthetic/redacted calibration samples
+- improve QR recovery for low-resolution and skewed scans
+- add non-blue/monochrome seal research without weakening false-positive controls
+- optional trusted issuer verification if an official, documented integration becomes available
 
 ### Later
 

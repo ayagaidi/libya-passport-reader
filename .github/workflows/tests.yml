@@ -50,7 +50,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r requirements-vision.txt
 
       - name: Check vision worker syntax
-        run: python -m py_compile tools/passport_vision.py
+        run: python -m py_compile tools/passport_vision.py tools/civil_registry_verify.py
 
       - name: Run synthetic vision tests
         run: python -m unittest discover -s tests/vision -p 'test_*.py'
