@@ -9,6 +9,8 @@ use Throwable;
 
 final class TesseractVisualZoneOcrEngine implements VisualZoneOcrEngineInterface
 {
+    public function __construct(private readonly TesseractTsvParser $tsvParser) {}
+
     public function read(string $imagePath): OcrResult
     {
         $language = (string) config('passport.visual_zone.language', 'eng+ara');
@@ -26,9 +28,16 @@ final class TesseractVisualZoneOcrEngine implements VisualZoneOcrEngineInterface
             throw new ScannerDependencyException('The visual-zone OCR engine failed to process the document.');
         }
 
+        $parsed = $this->tsvParser->parse($process->getOutput());
+
         return new OcrResult(
             engine: 'tesseract-visual:'.$usedLanguage,
-            text: trim($process->getOutput()),
+            text: $parsed['text'],
+            confidence: $parsed['confidence'],
+            metadata: [
+                'lines' => $parsed['lines'],
+                'format' => 'tsv',
+            ],
         );
     }
 
@@ -45,6 +54,7 @@ final class TesseractVisualZoneOcrEngine implements VisualZoneOcrEngineInterface
             $language,
             '--psm',
             $pageSegmentationMode,
+            'tsv',
         ]);
         $process->setTimeout((float) config('passport.visual_zone.timeout', 20));
 
