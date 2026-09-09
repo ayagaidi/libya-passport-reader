@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Libya Passport Reader API
-  version: 0.3.0-dev
-  description: Privacy-first API for scanning, parsing, and validating ICAO Doc 9303 TD3 passport MRZ data with Arabic/English visual-zone extraction and conservative MRZ comparison.
+  version: 0.3.1-dev
+  description: Privacy-first API for smart passport preprocessing, ICAO Doc 9303 TD3 MRZ parsing and validation, Arabic/English visual-zone extraction, and conservative MRZ comparison.
 servers:
   - url: http://localhost:8000
 paths:
@@ -20,7 +20,7 @@ paths:
           description: Metadata
   /api/v1/passport/scan:
     post:
-      summary: Scan a passport image or first page of a PDF, parse TD3 MRZ, extract visible fields, and compare both sources
+      summary: Preprocess and scan a passport image or first page of a PDF, parse TD3 MRZ, extract visible fields, and compare both sources
       requestBody:
         required: true
         content:
@@ -35,7 +35,7 @@ paths:
                   description: JPEG, PNG, WebP, or PDF. Maximum size is deployment-configurable.
       responses:
         '200':
-          description: Parsed passport fields, MRZ validation, OCR metadata, visual-zone fields, conservative comparison results, and privacy metadata
+          description: Parsed passport fields, MRZ validation, smart-scanner metadata, OCR metadata, visual-zone fields, conservative comparison results, and privacy metadata
         '422':
           description: Invalid upload or TD3 MRZ not confidently detected
         '503':
