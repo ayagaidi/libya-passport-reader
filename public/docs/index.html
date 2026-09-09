@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Libya Passport Reader API Docs</title>
+  <title>Libya Document Reader API Docs</title>
   <link rel="stylesheet" href="/docs/swagger-ui.css">
   <link rel="icon" type="image/png" href="/docs/favicon-32x32.png" sizes="32x32">
   <style>
@@ -11,9 +11,36 @@
     *, *::before, *::after { box-sizing: inherit; }
     body { margin: 0; background: #fafafa; }
     .topbar { display: none; }
+    .demo-banner {
+      margin: 18px auto 4px;
+      max-width: 1460px;
+      padding: 14px 18px;
+      background: #fff7dd;
+      border: 1px solid #e8c75b;
+      border-radius: 6px;
+      color: #3b3420;
+      font-family: Arial, sans-serif;
+      line-height: 1.55;
+    }
+    .demo-banner code {
+      display: inline-block;
+      margin: 4px 0;
+      padding: 3px 7px;
+      background: #ffffff;
+      border: 1px solid #d7c170;
+      border-radius: 4px;
+      font-weight: 700;
+      user-select: all;
+    }
   </style>
 </head>
 <body>
+  <div class="demo-banner">
+    <strong>Public Demo Access / تجربة عامة:</strong>
+    Swagger is automatically authorized with the public demo key
+    <code>ldr_demo_public_2026_v1</code>.
+    Demo access is for testing only, is rate-limited per IP, has a shared global cap, may be rotated at any time, and must not be used as a production credential.
+  </div>
   <div id="swagger-ui"></div>
   <script src="/docs/swagger-ui-bundle.js"></script>
   <script src="/docs/swagger-ui-standalone-preset.js"></script>
@@ -28,6 +55,9 @@
         tryItOutEnabled: true,
         persistAuthorization: false,
         validatorUrl: null,
+        onComplete: () => {
+          window.ui.preauthorizeApiKey('ApiKeyAuth', 'ldr_demo_public_2026_v1');
+        },
         presets: [
           SwaggerUIBundle.presets.apis,
           SwaggerUIStandalonePreset
