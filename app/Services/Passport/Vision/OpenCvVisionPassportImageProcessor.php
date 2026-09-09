@@ -27,6 +27,8 @@ final class OpenCvVisionPassportImageProcessor implements VisionPassportImagePro
             '--blur-reject', (string) config('passport.vision.blur_reject_threshold', 35),
             '--glare-warning', (string) config('passport.vision.glare_warning_ratio', 0.18),
             '--glare-reject', (string) config('passport.vision.glare_reject_ratio', 0.35),
+            '--overexposure-warning', (string) config('passport.vision.overexposure_warning_ratio', 0.80),
+            '--overexposure-reject', (string) config('passport.vision.overexposure_reject_ratio', 0.95),
             '--max-dimension', (string) config('passport.vision.max_detection_dimension', 1400),
         ]);
         $process->setTimeout((float) config('passport.vision.timeout', 12));
@@ -51,34 +53,43 @@ final class OpenCvVisionPassportImageProcessor implements VisionPassportImagePro
             );
         }
 
-        if (! $process->isSuccessful() && ($payload['status'] ?? null) !== 'not_detected') {
+        if (! $process->isSuccessful() && ! in_array(($payload['status'] ?? null), ['not_detected', 'cropped'], true)) {
             return $this->fallbackAfterCleanup($imagePath, $outputPath, 'vision_processing_failed');
         }
 
+        $status = (string) ($payload['status'] ?? 'unknown');
         $perspectiveCorrected = (bool) ($payload['perspective_corrected'] ?? false);
         $documentDetected = (bool) ($payload['document_detected'] ?? false);
-        $useCorrectedImage = $perspectiveCorrected && is_file($outputPath);
-        $temporaryPaths = $useCorrectedImage ? [$outputPath] : [];
+        $contentCropped = $status === 'cropped' && is_file($outputPath);
+        $useProcessedImage = ($perspectiveCorrected || $contentCropped) && is_file($outputPath);
+        $temporaryPaths = $useProcessedImage ? [$outputPath] : [];
 
-        if ($useCorrectedImage) {
+        if ($useProcessedImage) {
             @chmod($outputPath, 0600);
         } elseif (is_file($outputPath)) {
             @unlink($outputPath);
         }
 
+        $strategy = match (true) {
+            $perspectiveCorrected => 'opencv_document_corners',
+            $contentCropped => 'opencv_content_crop',
+            default => 'opencv_quality_only',
+        };
+
         return new VisionPassportImage(
-            imagePath: $useCorrectedImage ? $outputPath : $imagePath,
+            imagePath: $useProcessedImage ? $outputPath : $imagePath,
             temporaryPaths: $temporaryPaths,
-            strategy: $useCorrectedImage ? 'opencv_document_corners' : 'opencv_quality_only',
+            strategy: $strategy,
             documentDetected: $documentDetected,
-            perspectiveCorrected: $useCorrectedImage,
+            perspectiveCorrected: $perspectiveCorrected,
             quality: $this->quality($payload['quality'] ?? []),
             diagnostics: [
-                'status' => (string) ($payload['status'] ?? 'unknown'),
+                'status' => $status,
                 'detection_method' => $payload['detection_method'] ?? null,
                 'document_area_ratio' => isset($payload['document_area_ratio'])
                     ? round((float) $payload['document_area_ratio'], 4)
                     : null,
+                'quality_scope' => $payload['quality_scope'] ?? null,
             ],
         );
     }
@@ -98,10 +109,13 @@ final class OpenCvVisionPassportImageProcessor implements VisionPassportImagePro
                 : 'not_evaluated',
             'reasons' => array_values(array_filter(
                 is_array($quality['reasons'] ?? null) ? $quality['reasons'] : [],
-                static fn (mixed $reason): bool => in_array($reason, ['blur', 'glare'], true),
+                static fn (mixed $reason): bool => in_array($reason, ['blur', 'glare', 'overexposure'], true),
             )),
             'blur_score' => isset($quality['blur_score']) ? round((float) $quality['blur_score'], 2) : null,
             'glare_ratio' => isset($quality['glare_ratio']) ? round((float) $quality['glare_ratio'], 4) : null,
+            'overexposure_ratio' => isset($quality['overexposure_ratio'])
+                ? round((float) $quality['overexposure_ratio'], 4)
+                : null,
         ];
     }
 
