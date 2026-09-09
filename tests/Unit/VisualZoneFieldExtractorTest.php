@@ -9,7 +9,7 @@ final class VisualZoneFieldExtractorTest extends TestCase
 {
     public function test_it_extracts_bilingual_labeled_fields_without_returning_raw_ocr(): void
     {
-        $extractor = new VisualZoneFieldExtractor();
+        $extractor = new VisualZoneFieldExtractor;
 
         $fields = $extractor->extract(implode("\n", [
             'Surname / اللقب: TESTER',
