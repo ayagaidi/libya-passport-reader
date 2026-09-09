@@ -12,6 +12,19 @@ return [
         'timeout' => (int) env('PASSPORT_OCR_TIMEOUT', 20),
     ],
 
+    'vision' => [
+        'enabled' => (bool) env('PASSPORT_VISION_ENABLED', true),
+        'python_binary' => env('PASSPORT_VISION_PYTHON_BINARY', 'python3'),
+        'timeout' => (int) env('PASSPORT_VISION_TIMEOUT', 12),
+        'max_detection_dimension' => (int) env('PASSPORT_VISION_MAX_DIMENSION', 1400),
+        'min_document_area_ratio' => (float) env('PASSPORT_VISION_MIN_DOCUMENT_AREA', 0.20),
+        'blur_warning_threshold' => (float) env('PASSPORT_VISION_BLUR_WARNING', 75),
+        'blur_reject_threshold' => (float) env('PASSPORT_VISION_BLUR_REJECT', 35),
+        'glare_warning_ratio' => (float) env('PASSPORT_VISION_GLARE_WARNING', 0.18),
+        'glare_reject_ratio' => (float) env('PASSPORT_VISION_GLARE_REJECT', 0.35),
+        'reject_low_quality' => (bool) env('PASSPORT_VISION_REJECT_LOW_QUALITY', true),
+    ],
+
     'smart_scanner' => [
         'enabled' => (bool) env('PASSPORT_SMART_SCANNER_ENABLED', true),
         'imagemagick_binary' => env('PASSPORT_IMAGEMAGICK_BINARY', 'magick'),

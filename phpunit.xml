@@ -20,5 +20,6 @@
         <env name="LOG_CHANNEL" value="null"/>
         <env name="PASSPORT_VISUAL_ZONE_ENABLED" value="false"/>
         <env name="PASSPORT_SMART_SCANNER_ENABLED" value="false"/>
+        <env name="PASSPORT_VISION_ENABLED" value="false"/>
     </php>
 </phpunit>

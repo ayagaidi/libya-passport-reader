@@ -2,54 +2,51 @@
 
 **Privacy-first Laravel API for reading and validating passport MRZ data from text, images, and PDF scans.**
 
-Libya Passport Reader is an independent open-source developer project focused on turning machine-readable passport data into structured, validated JSON. It targets the two-line **TD3 MRZ** defined by ICAO Doc 9303 and provides a Libya-focused workflow without hard-coding unverified passport-specific assumptions.
+Libya Passport Reader is an independent open-source developer project focused on ICAO Doc 9303 TD3 passports. It combines local OCR, conservative MRZ validation, bilingual visible-field extraction, and a privacy-first computer-vision pipeline without claiming document authenticity.
 
-> This is not an official Libyan government service and is not presented as being approved, endorsed, or affiliated with Libyan passport authorities. A mathematically valid MRZ or a visual-zone match is not proof that a passport is genuine.
+> This is not an official Libyan government service and is not approved, endorsed, or affiliated with Libyan passport authorities. A valid MRZ, corrected document image, or visual-zone match is not proof that a passport is genuine.
 
-## v0.3.2 Adaptive Passport Scanner
+## v0.3.3 Vision Passport Scanner
 
-v0.3.2 strengthens the v0.3.1 smart preprocessing pipeline by making MRZ region selection adaptive instead of relying on one crop.
+v0.3.3 adds a real computer-vision stage before the existing adaptive OCR pipeline.
 
-- configurable ImageMagick preprocessing
-- automatic EXIF orientation correction
-- grayscale normalization
-- deskew
-- contrast stretch and sharpening
-- bounded image resizing
-- multiple configurable TD3 MRZ crop candidates
-- normalized-image and original-image fallbacks
-- local OCR on every viable MRZ candidate
-- ICAO/check-digit detection scoring for every OCR result
-- OCR confidence used only as a small quality tie-breaker
-- automatic selection of the strongest MRZ candidate
-- configurable visual-zone crop
-- Arabic/English visual OCR with real Tesseract TSV confidence
-- all normalized/cropped images remain private temporary files and are deleted before the request returns
+- OpenCV contour-based document detection
+- best-quadrilateral selection from detected page boundaries
+- rotated-rectangle fallback for strong rectangular contours
+- four-corner ordering and perspective transform
+- automatic landscape normalization after perspective correction
+- blur quality scoring using Laplacian variance
+- glare/overexposure scoring using clipped low-saturation highlights
+- `accepted`, `warning`, and `rejected` image-quality states
+- configurable hard rejection for severely low-quality frames
+- privacy-safe vision metadata without corner coordinates or temporary paths
+- safe fallback to v0.3.2 when OpenCV is disabled, unavailable, or no document contour is confidently detected
+- synthetic OpenCV tests in a dedicated GitHub Actions job
 
-This substantially reduces dependence on a single fixed MRZ vertical position, which is useful for mobile photos where the passport may be framed differently.
+The vision stage runs before ImageMagick preprocessing. A successfully rectified document is then passed into the existing adaptive MRZ scanner, which still tries multiple MRZ crops and ranks candidates primarily using ICAO structure/check-digit evidence.
 
-The scanner still does **not** claim passport authenticity verification. True detected document-corner geometry and perspective correction remain separate computer-vision enhancements.
+## Scanner pipeline
 
-## Existing scanner capabilities
+`upload/PDF → document detection → perspective correction → quality gate → smart preprocessing → adaptive MRZ OCR → MRZ validation → Arabic/English visual OCR → MRZ/visual comparison`
 
-- TD3 MRZ parsing and ICAO check-digit validation
-- image upload from camera/gallery (`JPEG`, `PNG`, `WebP`)
-- first-page PDF scanning
+Current capabilities include:
+
+- JPEG, PNG, WebP, and first-page PDF scanning
 - local Tesseract OCR
-- automatic MRZ candidate detection and check-digit scoring
+- TD3 MRZ parsing and ICAO check-digit validation
+- multiple configurable MRZ region candidates
+- ICAO-based MRZ candidate ranking with OCR confidence only as a small tie-breaker
 - Arabic + English visual-zone OCR
+- real Tesseract TSV confidence for visible-field OCR
 - labeled-field extraction for names, passport number, nationality, dates, sex, place of birth, issue date, and issuing place
-- comparison of MRZ-backed visual fields against parsed MRZ data
-- `match`, `mismatch`, `not_detected`, and `not_comparable` reporting
-- visual-only fields kept separate when the MRZ has no equivalent
-- structured JSON output
-- private temporary processing with immediate cleanup
-- raw OCR text is never returned by the API
+- conservative comparison of visible fields against MRZ data
+- private temporary processing and deterministic cleanup
+- no raw OCR response
 - no passport-image persistence
 - no passport-data persistence
-- OpenAPI 3.1 and automated Laravel tests
+- OpenAPI 3.1, Laravel tests, and dedicated synthetic vision tests
 
-Arabic names are **not automatically treated as equal to Latin MRZ transliterations**. The API reports them as `not_comparable` unless a safe comparison can be made. This avoids pretending that transliteration is deterministic.
+Arabic names are **not automatically treated as equal to Latin MRZ transliterations**. They are reported as `not_comparable` unless a safe comparison is possible.
 
 The repository and tests use synthetic data only. **Never commit real passport images, MRZ lines, passport numbers, or personal data.**
 
@@ -59,31 +56,38 @@ The repository and tests use synthetic data only. **Never commit real passport i
 
 `POST /api/v1/passport/scan`
 
-Send `multipart/form-data` with a file field named `passport`.
-
 ```bash
 curl -X POST http://localhost:8000/api/v1/passport/scan \
   -H 'Accept: application/json' \
   -F 'passport=@passport.jpg'
 ```
 
-A mobile or Flutter camera can send the captured frame to the same endpoint.
-
-The response contains parsed MRZ fields, ICAO validation, adaptive smart-scanner metadata, OCR-engine metadata, extracted visual-zone fields, MRZ/visual comparisons, and privacy metadata. It does **not** return raw OCR text and it does not claim passport authenticity verification.
-
-Example smart-scanner metadata:
+A successful response includes vision metadata such as:
 
 ```json
 {
   "scan": {
-    "mrz_detected": true,
+    "vision": {
+      "strategy": "opencv_document_corners",
+      "document_detected": true,
+      "perspective_corrected": true,
+      "quality": {
+        "status": "accepted",
+        "reasons": [],
+        "blur_score": 143.8,
+        "glare_ratio": 0.021
+      },
+      "diagnostics": {
+        "status": "corrected",
+        "detection_method": "contour_quad",
+        "document_area_ratio": 0.61
+      }
+    },
     "smart_scanner": {
       "strategy": "imagemagick_adaptive_regions",
-      "region_detection_applied": true,
       "adaptive_mrz": {
         "enabled": true,
         "candidate_count": 5,
-        "attempts": 5,
         "selected_candidate": 1,
         "detection_score": 35
       }
@@ -92,9 +96,21 @@ Example smart-scanner metadata:
 }
 ```
 
-No temporary file path is returned in the response.
+No corner coordinates, raw OCR text, or temporary file paths are returned.
 
-If smart preprocessing cannot be used, the API reports `full_image_fallback` and continues with the existing privacy-first scanner behavior.
+A severely blurred or overexposed image can return:
+
+```json
+{
+  "code": "low_image_quality",
+  "quality": {
+    "status": "rejected",
+    "reasons": ["blur"]
+  }
+}
+```
+
+Warnings do not block scanning. Hard rejection is configurable with `PASSPORT_VISION_REJECT_LOW_QUALITY`.
 
 ### Parse MRZ text directly
 
@@ -107,27 +123,18 @@ If smart preprocessing cannot be used, the API reports `full_image_fallback` and
 }
 ```
 
-The example above is fictional/synthetic test data.
+The example is fictional/synthetic test data.
 
-### Validate MRZ
+### Other endpoints
 
-`POST /api/v1/passport/mrz/validate`
-
-### Metadata
-
-`GET /api/v1/meta`
-
-### Health
-
-`GET /health`
-
-### OpenAPI
-
-`GET /openapi.yaml`
+- `POST /api/v1/passport/mrz/validate`
+- `GET /api/v1/meta`
+- `GET /health`
+- `GET /openapi.yaml`
 
 ## Local setup
 
-### 1. Application
+### 1. Laravel
 
 ```bash
 composer install
@@ -135,94 +142,94 @@ cp .env.example .env
 php artisan key:generate
 ```
 
-### 2. OCR and smart-scanner dependencies
+### 2. OCR and image dependencies
 
 macOS with Homebrew:
 
 ```bash
-brew install tesseract tesseract-lang poppler imagemagick
+brew install tesseract tesseract-lang poppler imagemagick python
 ```
 
 Ubuntu/Debian:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y tesseract-ocr tesseract-ocr-ara poppler-utils imagemagick
+sudo apt-get install -y tesseract-ocr tesseract-ocr-ara poppler-utils imagemagick python3 python3-venv
 ```
 
-`poppler-utils` provides `pdftoppm`, which is used only when the uploaded input is a PDF.
+### 3. OpenCV vision environment
 
-The visual-zone scanner defaults to `eng+ara`. If Arabic language data is unavailable, it can fall back to English using `PASSPORT_VISUAL_OCR_FALLBACK_LANGUAGE=eng`.
+Use an isolated Python environment for the server-side vision worker:
 
-The smart scanner defaults to the ImageMagick 7 executable `magick`. On systems using another compatible executable, set `PASSPORT_IMAGEMAGICK_BINARY` accordingly. The feature can be disabled with `PASSPORT_SMART_SCANNER_ENABLED=false`.
+```bash
+python3 -m venv .venv-vision
+.venv-vision/bin/python -m pip install --upgrade pip
+.venv-vision/bin/python -m pip install -r requirements-vision.txt
+```
 
-Adaptive MRZ start ratios can be tuned with:
+Then configure:
 
 ```env
-PASSPORT_SMART_SCANNER_MRZ_CANDIDATES=0.54,0.60,0.66
-PASSPORT_SMART_SCANNER_MAX_MRZ_CANDIDATES=4
+PASSPORT_VISION_ENABLED=true
+PASSPORT_VISION_PYTHON_BINARY=/absolute/path/to/project/.venv-vision/bin/python
+PASSPORT_VISION_REJECT_LOW_QUALITY=true
 ```
 
-The configured primary ratio is also included in the candidate set. The scanner then adds normalized/full-image fallbacks internally.
+If the vision dependency is unavailable, scanning falls back to the existing privacy-first adaptive scanner instead of failing only because OpenCV is missing.
 
-### 3. Run
+### 4. Run
 
 ```bash
 php artisan serve
 ```
 
-Then visit `http://localhost:8000/health`.
+## Quality thresholds
+
+The defaults are conservative starting points and should be calibrated against private synthetic/redacted evaluation data for the deployment camera workflow:
+
+```env
+PASSPORT_VISION_MIN_DOCUMENT_AREA=0.20
+PASSPORT_VISION_BLUR_WARNING=75
+PASSPORT_VISION_BLUR_REJECT=35
+PASSPORT_VISION_GLARE_WARNING=0.18
+PASSPORT_VISION_GLARE_REJECT=0.35
+```
+
+`warning` continues scanning. `rejected` returns HTTP 422 when hard rejection is enabled.
 
 ## Privacy lifecycle
 
 For `/passport/scan` the server:
 
-1. accepts the upload after MIME and size validation;
-2. copies it to a randomly named private temporary path with restrictive permissions;
-3. rasterizes only page 1 when the input is a PDF;
-4. optionally normalizes the image and creates multiple temporary MRZ crops plus a visual-zone crop;
-5. runs local MRZ OCR across the private candidate images;
-6. scores detected TD3 candidates using ICAO structure/check digits and selects the strongest result;
-7. parses and validates the selected MRZ;
-8. optionally runs Arabic/English visual-zone OCR on the visual crop;
-9. extracts labeled visual fields and compares MRZ-backed fields;
-10. deletes the upload, PDF raster, normalized image, and every region crop in a `finally` block before returning the response.
+1. validates the upload and copies it to random private temporary storage;
+2. rasterizes only page 1 for PDFs;
+3. optionally detects the document boundary locally with OpenCV;
+4. creates a private perspective-corrected frame when four corners are confidently detected;
+5. computes blur/glare quality metrics locally;
+6. rejects only severe low-quality input when configured to do so;
+7. generates private normalized and MRZ/visual-zone crops;
+8. runs local OCR across adaptive MRZ candidates and selects the strongest ICAO result;
+9. parses/validates MRZ data and compares it with visible Arabic/English fields;
+10. deletes the upload, PDF raster, corrected image, normalized image, and every crop in a `finally` cleanup before returning.
 
-The application does not create passport database records. Full MRZ strings, raw OCR output, and temporary file paths must not be written to logs.
+The application does not create passport database records. Full MRZ strings, raw OCR/TSV output, corrected images, and temporary paths must not be logged.
 
 See [SECURITY.md](SECURITY.md).
-
-## Comparison model
-
-Visual fields that have MRZ equivalents can be compared:
-
-- surname
-- given names
-- passport number
-- nationality
-- date of birth
-- sex
-- expiry date
-
-Visual-zone fields without a TD3 MRZ equivalent are returned separately and are not presented as MRZ-verified:
-
-- place of birth
-- issue date
-- issuing place / authority
-
-A successful comparison means the OCR-visible value and MRZ value are consistent after conservative normalization. It is **not** an authenticity decision.
 
 ## Roadmap
 
 ### v0.3.x
-- detected document-corner geometry and perspective correction
-- stronger glare/shadow and blur handling
-- layout-profile calibration using private synthetic/redacted evaluation data
-- confidence thresholds and optional low-confidence field suppression
+
+- stronger shadow and localized glare correction
+- private camera/layout calibration tooling
+- optional low-confidence visible-field suppression
+- capture guidance metadata for mobile clients
+- benchmark reporting from synthetic/redacted evaluation sets
 
 ### Later
-- Flutter live camera scanner
-- optional on-device OCR
+
+- Flutter live camera scanner with framing guidance
+- optional on-device OCR/vision
 - ePassport/NFC research only where technically and legally appropriate
 
 ## License
