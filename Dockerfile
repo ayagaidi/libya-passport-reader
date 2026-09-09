@@ -1,3 +1,5 @@
+FROM docker.swagger.io/swaggerapi/swagger-ui:v5.32.15 AS swagger-ui
+
 FROM php:8.3-cli-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -34,6 +36,9 @@ RUN composer install \
     --no-interaction \
     --no-progress \
     --no-scripts
+
+# Bundle Swagger UI static assets from the official Swagger Docker image.
+COPY --from=swagger-ui /usr/share/nginx/html /app/public/docs
 
 COPY . .
 
