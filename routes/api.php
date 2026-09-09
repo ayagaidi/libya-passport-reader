@@ -8,12 +8,13 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->middleware('throttle:'.env('PASSPORT_API_RATE_LIMIT', 60).',1')->group(function (): void {
     Route::get('/meta', fn () => response()->json([
         'name' => 'Libya Document Reader',
-        'version' => '0.4.0-dev',
-        'scope' => 'Vision-corrected passport and Libyan Civil Registry Authority document scanning with bilingual OCR and structured extraction',
+        'version' => '0.4.1-dev',
+        'scope' => 'Vision-corrected passport and Libyan Civil Registry Authority document scanning with bilingual OCR, structured extraction, and conservative verification signals',
         'privacy' => [
             'stores_document_images' => false,
             'stores_document_data' => false,
             'returns_raw_ocr_text' => false,
+            'returns_raw_qr_payload' => false,
         ],
         'supported_documents' => [
             'passport_td3',
@@ -24,6 +25,14 @@ Route::prefix('v1')->middleware('throttle:'.env('PASSPORT_API_RATE_LIMIT', 60).'
             'document_detection' => 'OpenCV contour-based quadrilateral detection with safe fallback',
             'perspective_correction' => true,
             'quality_gate' => ['blur', 'glare', 'overexposure'],
+        ],
+        'civil_registry_verification' => [
+            'qr_detection' => true,
+            'qr_check_number_structure_validation' => true,
+            'seal_detection' => 'blue-ink visual candidates',
+            'template_checks' => 'sample-calibrated text anchors and visual positions',
+            'issuer_database_checked' => false,
+            'document_authenticity_verified' => false,
         ],
         'smart_scanner' => [
             'preprocessing' => ['auto_orient', 'grayscale', 'deskew', 'contrast_stretch', 'sharpen'],
