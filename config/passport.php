@@ -40,6 +40,10 @@ return [
             explode(',', (string) env('PASSPORT_SMART_SCANNER_MRZ_CANDIDATES', '0.54,0.60,0.66')),
         ),
         'max_mrz_candidates' => (int) env('PASSPORT_SMART_SCANNER_MAX_MRZ_CANDIDATES', 4),
+        'mrz_adaptive_threshold_enabled' => (bool) env('PASSPORT_MRZ_ADAPTIVE_THRESHOLD_ENABLED', true),
+        'mrz_adaptive_target_width' => (int) env('PASSPORT_MRZ_ADAPTIVE_TARGET_WIDTH', 3200),
+        'mrz_adaptive_block_size' => (int) env('PASSPORT_MRZ_ADAPTIVE_BLOCK_SIZE', 41),
+        'mrz_adaptive_constant' => (float) env('PASSPORT_MRZ_ADAPTIVE_CONSTANT', 15),
         'visual_end_ratio' => (float) env('PASSPORT_SMART_SCANNER_VISUAL_END', 0.78),
     ],
 
