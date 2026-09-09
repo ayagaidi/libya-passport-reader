@@ -34,6 +34,8 @@ final class CivilRegistryScanController extends Controller
                     'residence_certificate',
                     'family_status_certificate',
                 ],
+                'verification_mode' => 'advisory_signals',
+                'issuer_database_checked' => false,
                 'document_authenticity_verified' => false,
             ],
         ]);
