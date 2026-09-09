@@ -2,7 +2,6 @@
 
 import argparse
 import json
-import math
 import sys
 
 try:
@@ -22,6 +21,8 @@ def parse_args():
     parser.add_argument("--blur-reject", type=float, default=35.0)
     parser.add_argument("--glare-warning", type=float, default=0.18)
     parser.add_argument("--glare-reject", type=float, default=0.35)
+    parser.add_argument("--overexposure-warning", type=float, default=0.80)
+    parser.add_argument("--overexposure-reject", type=float, default=0.95)
     parser.add_argument("--max-dimension", type=int, default=1400)
     return parser.parse_args()
 
@@ -96,6 +97,67 @@ def find_document(image, min_area_ratio, max_dimension):
     return None, 0.0, None
 
 
+def crop_content_region(image, max_dimension=1200):
+    """Trim scanner/PDF margins without claiming document-corner detection."""
+    preview, scale = resize_for_detection(image, max_dimension)
+    height, width = preview.shape[:2]
+    image_area = float(height * width)
+    gray = cv2.cvtColor(preview, cv2.COLOR_BGR2GRAY)
+    hsv = cv2.cvtColor(preview, cv2.COLOR_BGR2HSV)
+
+    content_mask = ((gray < 245) | (hsv[:, :, 1] > 20)).astype(np.uint8) * 255
+
+    border = max(2, int(round(min(height, width) * 0.015)))
+    content_mask[:border, :] = 0
+    content_mask[-border:, :] = 0
+    content_mask[:, :border] = 0
+    content_mask[:, -border:] = 0
+
+    kernel_size = max(5, int(round(min(height, width) * 0.018)))
+    if kernel_size % 2 == 0:
+        kernel_size += 1
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
+    content_mask = cv2.morphologyEx(content_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+    count, _, stats, _ = cv2.connectedComponentsWithStats(content_mask, 8)
+    candidates = []
+    for index in range(1, count):
+        x, y, box_width, box_height, area = stats[index]
+        box_area = float(box_width * box_height)
+        if area < image_area * 0.01:
+            continue
+        if box_area < image_area * 0.08 or box_area > image_area * 0.90:
+            continue
+        if min(box_width, box_height) < 120:
+            continue
+        candidates.append((int(area), int(x), int(y), int(box_width), int(box_height)))
+
+    if not candidates:
+        return None, 0.0
+
+    _, x, y, box_width, box_height = max(candidates, key=lambda item: item[0])
+    padding = max(4, int(round(max(box_width, box_height) * 0.02)))
+    x0 = max(0, x - padding)
+    y0 = max(0, y - padding)
+    x1 = min(width, x + box_width + padding)
+    y1 = min(height, y + box_height + padding)
+
+    original_x0 = max(0, int(round(x0 / scale)))
+    original_y0 = max(0, int(round(y0 / scale)))
+    original_x1 = min(image.shape[1], int(round(x1 / scale)))
+    original_y1 = min(image.shape[0], int(round(y1 / scale)))
+
+    cropped = image[original_y0:original_y1, original_x0:original_x1]
+    if cropped.size == 0 or min(cropped.shape[:2]) < 120:
+        return None, 0.0
+
+    crop_ratio = float((cropped.shape[0] * cropped.shape[1]) / (image.shape[0] * image.shape[1]))
+    if crop_ratio >= 0.92:
+        return None, 0.0
+
+    return cropped, crop_ratio
+
+
 def warp_document(image, points):
     rect = order_points(points)
     top_left, top_right, bottom_right, bottom_left = rect
@@ -131,24 +193,49 @@ def quality_metrics(image, args):
     hsv = cv2.cvtColor(preview, cv2.COLOR_BGR2HSV)
     saturation = hsv[:, :, 1]
     value = hsv[:, :, 2]
-    glare_mask = (value >= 250) & (saturation <= 25)
-    glare_ratio = float(np.count_nonzero(glare_mask) / glare_mask.size)
 
-    rejected = blur_score < args.blur_reject or glare_ratio > args.glare_reject
-    warning = blur_score < args.blur_warning or glare_ratio > args.glare_warning
+    bright_low_saturation = (value >= 250) & (saturation <= 25)
+    glare_ratio = float(np.count_nonzero(bright_low_saturation) / bright_low_saturation.size)
+
+    extreme_white = (value >= 253) & (saturation <= 18)
+    overexposure_ratio = float(np.count_nonzero(extreme_white) / extreme_white.size)
+
+    # Glare is advisory because pale/white passport stock is legitimate. Hard rejection is
+    # reserved for severe blur or a nearly blown-out frame. OCR + ICAO validation gets the
+    # final opportunity to determine whether localized glare actually made the MRZ unusable.
+    rejected = (
+        blur_score < args.blur_reject
+        or overexposure_ratio > args.overexposure_reject
+    )
+    warning = (
+        blur_score < args.blur_warning
+        or glare_ratio > args.glare_warning
+        or overexposure_ratio > args.overexposure_warning
+    )
     status = "rejected" if rejected else ("warning" if warning else "accepted")
+
     reasons = []
     if blur_score < args.blur_warning:
         reasons.append("blur")
     if glare_ratio > args.glare_warning:
         reasons.append("glare")
+    if overexposure_ratio > args.overexposure_warning:
+        reasons.append("overexposure")
 
     return {
         "status": status,
         "reasons": reasons,
         "blur_score": round(blur_score, 4),
         "glare_ratio": round(glare_ratio, 6),
+        "overexposure_ratio": round(overexposure_ratio, 6),
     }
+
+
+def write_processed_image(path, image, failure_reason):
+    if not cv2.imwrite(path, image):
+        print(json.dumps({"status": "unavailable", "reason": failure_reason}))
+        return False
+    return True
 
 
 def main():
@@ -165,13 +252,31 @@ def main():
     )
 
     if points is None:
-        quality = quality_metrics(image, args)
+        cropped, crop_ratio = crop_content_region(image)
+        quality_image = cropped if cropped is not None else image
+        quality = quality_metrics(quality_image, args)
+
+        if cropped is not None:
+            if not write_processed_image(args.output_path, cropped, "content_crop_write_failed"):
+                return 6
+            print(json.dumps({
+                "status": "cropped",
+                "document_detected": False,
+                "perspective_corrected": False,
+                "detection_method": "content_bounds",
+                "document_area_ratio": round(float(crop_ratio), 6),
+                "quality_scope": "content_region",
+                "quality": quality,
+            }))
+            return 0
+
         print(json.dumps({
             "status": "not_detected",
             "document_detected": False,
             "perspective_corrected": False,
             "detection_method": None,
             "document_area_ratio": 0.0,
+            "quality_scope": "full_image",
             "quality": quality,
         }))
         return 0
@@ -182,8 +287,7 @@ def main():
         return 5
 
     quality = quality_metrics(corrected, args)
-    if not cv2.imwrite(args.output_path, corrected):
-        print(json.dumps({"status": "unavailable", "reason": "corrected_image_write_failed"}))
+    if not write_processed_image(args.output_path, corrected, "corrected_image_write_failed"):
         return 6
 
     print(json.dumps({
@@ -192,6 +296,7 @@ def main():
         "perspective_corrected": True,
         "detection_method": detection_method,
         "document_area_ratio": round(float(area_ratio), 6),
+        "quality_scope": "rectified_document",
         "quality": quality,
     }))
     return 0

@@ -22,6 +22,8 @@ return [
         'blur_reject_threshold' => (float) env('PASSPORT_VISION_BLUR_REJECT', 35),
         'glare_warning_ratio' => (float) env('PASSPORT_VISION_GLARE_WARNING', 0.18),
         'glare_reject_ratio' => (float) env('PASSPORT_VISION_GLARE_REJECT', 0.35),
+        'overexposure_warning_ratio' => (float) env('PASSPORT_VISION_OVEREXPOSURE_WARNING', 0.80),
+        'overexposure_reject_ratio' => (float) env('PASSPORT_VISION_OVEREXPOSURE_REJECT', 0.95),
         'reject_low_quality' => (bool) env('PASSPORT_VISION_REJECT_LOW_QUALITY', true),
     ],
 
