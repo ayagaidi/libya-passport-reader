@@ -5,6 +5,7 @@ namespace App\Services\Passport;
 use App\Exceptions\ScannerDependencyException;
 use App\Services\Passport\Ocr\MrzTextExtractor;
 use App\Services\Passport\Ocr\OcrEngineInterface;
+use App\Services\Passport\SmartScanner\SmartPassportImageProcessorInterface;
 use App\Services\Passport\VisualZone\PassportVisualZoneComparator;
 use App\Services\Passport\VisualZone\VisualZoneFieldExtractor;
 use App\Services\Passport\VisualZone\VisualZoneOcrEngineInterface;
@@ -15,6 +16,7 @@ final class PassportScanService
     public function __construct(
         private readonly TemporaryPassportFileManager $temporaryFiles,
         private readonly PassportDocumentPreparer $documentPreparer,
+        private readonly SmartPassportImageProcessorInterface $smartImageProcessor,
         private readonly OcrEngineInterface $ocr,
         private readonly MrzTextExtractor $mrzExtractor,
         private readonly MrzParserService $mrzParser,
@@ -39,7 +41,10 @@ final class PassportScanService
                 $paths[] = $imagePath;
             }
 
-            $ocrResult = $this->ocr->read($imagePath);
+            $smartImage = $this->smartImageProcessor->prepare($imagePath);
+            $paths = array_merge($paths, $smartImage->temporaryPaths);
+
+            $ocrResult = $this->ocr->read($smartImage->mrzImagePath);
             [$line1, $line2] = $this->mrzExtractor->extract($ocrResult->text);
             $passport = $this->mrzParser->parse($line1, $line2);
 
@@ -50,8 +55,13 @@ final class PassportScanService
                     'ocr_engine' => $ocrResult->engine,
                     'ocr_confidence' => $ocrResult->confidence,
                     'source_type' => $mimeType === 'application/pdf' ? 'pdf' : 'image',
+                    'smart_scanner' => [
+                        'strategy' => $smartImage->strategy,
+                        'region_detection_applied' => $smartImage->strategy !== 'full_image_fallback',
+                        'preprocessing' => $smartImage->preprocessing,
+                    ],
                 ],
-                'visual_zone' => $this->readVisualZone($imagePath, $passport['data']),
+                'visual_zone' => $this->readVisualZone($smartImage->visualZoneImagePath, $passport['data']),
                 'privacy' => [
                     'stores_passport_images' => false,
                     'stores_passport_data' => false,
@@ -88,7 +98,10 @@ final class PassportScanService
             ];
         }
 
-        $fields = $this->visualZoneExtractor->extract($ocrResult->text);
+        $fields = $this->visualZoneExtractor->extract(
+            $ocrResult->text,
+            $ocrResult->metadata['lines'] ?? [],
+        );
         $comparison = $this->visualZoneComparator->compare($fields, $mrzData);
         $visualOnlyFields = array_intersect_key(
             $fields,

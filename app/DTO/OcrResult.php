@@ -8,5 +8,6 @@ final readonly class OcrResult
         public string $engine,
         public string $text,
         public ?float $confidence = null,
+        public array $metadata = [],
     ) {}
 }
