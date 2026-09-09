@@ -25,6 +25,15 @@ RUN apt-get update \
     && docker-php-ext-install intl zip opcache \
     && rm -rf /var/lib/apt/lists/*
 
+# Allow high-resolution passport images/PDFs while keeping an application-level cap.
+RUN printf '%s\n' \
+        'upload_max_filesize=32M' \
+        'post_max_size=40M' \
+        'memory_limit=256M' \
+        'max_execution_time=120' \
+        'max_input_time=120' \
+        > /usr/local/etc/php/conf.d/99-passport-uploads.ini
+
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
