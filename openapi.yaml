@@ -1,15 +1,17 @@
 openapi: 3.1.0
 info:
   title: Libya Document Reader API
-  version: 0.4.2-dev
+  version: 0.4.3-dev
   description: |
-    Privacy-first API for Libyan passport and Civil Registry Authority document scanning. It combines OpenCV document detection, adaptive ICAO Doc 9303 TD3 MRZ validation, Arabic/English OCR, conservative Civil Registry verification signals, API-key authentication, per-client rate limiting, and an origin allowlist for browser clients.
+    Privacy-first API for Libyan passport and Civil Registry Authority document scanning. It combines OpenCV document detection, adaptive ICAO Doc 9303 TD3 MRZ validation, Arabic/English OCR, conservative Civil Registry verification signals, API-key authentication, private per-client rate limiting, protected public demo access, and an origin allowlist for browser clients.
+
+    **Public demo access:** the hosted Swagger UI is automatically authorized with the testing-only key `ldr_demo_public_2026_v1`. The public demo is limited to **10 requests/minute per IP** with a **120 requests/minute shared global cap**. It may be rotated or disabled at any time and must not be used as a production credential.
 
     Supported Civil Registry Authority documents currently include **Residence Certificate (شهادة الإقامة)** and **Family Status Certificate (شهادة بالوضع العائلي)**.
 
     Civil Registry verification signals include QR detection/decoding, structural validation of recognized `CheckNumber` payloads, sample-calibrated template anchors, and visual blue-ink seal candidates. These signals **do not prove document authenticity** and the API does not claim issuer-database or digital-signature verification.
 
-    Use the **Authorize** button and provide the API key issued to your client. The key is sent in the `X-API-Key` header.
+    Private integrations should use a separately issued API key. The key is sent in the `X-API-Key` header.
 
     **Developer:** Aya Aljaidi  
     **GitHub:** [github.com/ayagaidi](https://github.com/ayagaidi)  
@@ -46,7 +48,7 @@ paths:
         '401':
           description: Missing or invalid API key
         '429':
-          description: Per-client API rate limit exceeded
+          description: Private per-client or public-demo rate limit exceeded
   /api/v1/passport/scan:
     post:
       summary: Detect and rectify a passport document, evaluate image quality, adaptively select the strongest TD3 MRZ candidate, extract visible fields, and compare both sources
@@ -70,7 +72,7 @@ paths:
         '422':
           description: Invalid upload, severely low image quality, or TD3 MRZ not confidently detected in any scan candidate
         '429':
-          description: Per-client API rate limit exceeded
+          description: Private per-client or public-demo rate limit exceeded
         '503':
           description: Required local MRZ OCR or PDF-processing dependency unavailable
   /api/v1/civil-registry/scan:
@@ -102,7 +104,7 @@ paths:
         '422':
           description: Invalid upload or supported Civil Registry Authority document not confidently detected
         '429':
-          description: Per-client API rate limit exceeded
+          description: Private per-client or public-demo rate limit exceeded
         '503':
           description: Required local OCR or PDF-processing dependency unavailable
   /api/v1/passport/mrz/parse:
@@ -122,7 +124,7 @@ paths:
         '422':
           description: Invalid MRZ input
         '429':
-          description: Per-client API rate limit exceeded
+          description: Private per-client or public-demo rate limit exceeded
   /api/v1/passport/mrz/validate:
     post:
       summary: Validate TD3 MRZ check digits
@@ -140,14 +142,14 @@ paths:
         '422':
           description: Invalid MRZ input
         '429':
-          description: Per-client API rate limit exceeded
+          description: Private per-client or public-demo rate limit exceeded
 components:
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
       in: header
       name: X-API-Key
-      description: Client API key issued by the deployment owner.
+      description: Use a private client key for production integrations. For hosted Swagger testing only, the public demo key is `ldr_demo_public_2026_v1`.
   schemas:
     MrzRequest:
       type: object
