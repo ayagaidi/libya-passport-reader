@@ -17,9 +17,8 @@ final class ImageMagickSmartPassportImageProcessor implements SmartPassportImage
         }
 
         $normalizedPath = $imagePath.'-smart-normalized.png';
-        $mrzPath = $imagePath.'-smart-mrz.png';
         $visualPath = $imagePath.'-smart-visual.png';
-        $temporaryPaths = [$normalizedPath, $mrzPath, $visualPath];
+        $temporaryPaths = [$normalizedPath, $visualPath];
 
         try {
             if (! $this->preprocess($imagePath, $normalizedPath)) {
@@ -32,27 +31,55 @@ final class ImageMagickSmartPassportImageProcessor implements SmartPassportImage
                 return $this->fallbackAfterCleanup($imagePath, $temporaryPaths, 'dimension_detection_failed');
             }
 
-            $regions = $this->geometry->calculate(
-                width: (int) $dimensions[0],
-                height: (int) $dimensions[1],
-                mrzStartRatio: (float) config('passport.smart_scanner.mrz_start_ratio', 0.62),
-                visualEndRatio: (float) config('passport.smart_scanner.visual_end_ratio', 0.78),
+            $width = (int) $dimensions[0];
+            $height = (int) $dimensions[1];
+            $visualEndRatio = (float) config('passport.smart_scanner.visual_end_ratio', 0.78);
+            $primaryMrzStartRatio = (float) config('passport.smart_scanner.mrz_start_ratio', 0.62);
+            $candidateRatios = $this->candidateRatios($primaryMrzStartRatio);
+            $mrzCandidatePaths = [];
+
+            foreach ($candidateRatios as $index => $ratio) {
+                $regions = $this->geometry->calculate(
+                    width: $width,
+                    height: $height,
+                    mrzStartRatio: $ratio,
+                    visualEndRatio: $visualEndRatio,
+                );
+                $candidatePath = $imagePath.'-smart-mrz-'.$index.'.png';
+                $temporaryPaths[] = $candidatePath;
+
+                if ($this->crop($normalizedPath, $candidatePath, $regions['mrz'], true)) {
+                    $mrzCandidatePaths[] = $candidatePath;
+                }
+            }
+
+            $primaryRegions = $this->geometry->calculate(
+                width: $width,
+                height: $height,
+                mrzStartRatio: $primaryMrzStartRatio,
+                visualEndRatio: $visualEndRatio,
             );
 
-            if (! $this->crop($normalizedPath, $mrzPath, $regions['mrz'], true)
-                || ! $this->crop($normalizedPath, $visualPath, $regions['visual_zone'], false)) {
+            if ($mrzCandidatePaths === [] || ! $this->crop($normalizedPath, $visualPath, $primaryRegions['visual_zone'], false)) {
                 return $this->fallbackAfterCleanup($imagePath, $temporaryPaths, 'region_crop_failed');
             }
 
             foreach ($temporaryPaths as $path) {
-                @chmod($path, 0600);
+                if (is_file($path)) {
+                    @chmod($path, 0600);
+                }
             }
 
+            $adaptiveCandidates = array_values(array_unique(array_merge(
+                $mrzCandidatePaths,
+                [$normalizedPath, $imagePath],
+            )));
+
             return new SmartPassportImage(
-                mrzImagePath: $mrzPath,
+                mrzImagePath: $mrzCandidatePaths[0],
                 visualZoneImagePath: $visualPath,
                 temporaryPaths: $temporaryPaths,
-                strategy: 'imagemagick_layout_regions',
+                strategy: 'imagemagick_adaptive_regions',
                 preprocessing: [
                     'auto_orient' => true,
                     'grayscale' => true,
@@ -60,9 +87,10 @@ final class ImageMagickSmartPassportImageProcessor implements SmartPassportImage
                     'contrast_stretch' => true,
                     'sharpen' => true,
                     'max_dimension' => (int) config('passport.smart_scanner.max_dimension', 2600),
-                    'mrz_start_ratio' => (float) config('passport.smart_scanner.mrz_start_ratio', 0.62),
-                    'visual_end_ratio' => (float) config('passport.smart_scanner.visual_end_ratio', 0.78),
+                    'mrz_candidate_start_ratios' => $candidateRatios,
+                    'visual_end_ratio' => $visualEndRatio,
                 ],
+                mrzCandidatePaths: $adaptiveCandidates,
             );
         } catch (Throwable) {
             return $this->fallbackAfterCleanup($imagePath, $temporaryPaths, 'processing_failed');
@@ -114,6 +142,22 @@ final class ImageMagickSmartPassportImageProcessor implements SmartPassportImage
         return $this->run($arguments) && is_file($outputPath);
     }
 
+    private function candidateRatios(float $primary): array
+    {
+        $configured = config('passport.smart_scanner.mrz_candidate_start_ratios', [0.54, 0.60, 0.66]);
+        $ratios = is_array($configured) ? $configured : [$primary];
+        $ratios[] = $primary;
+        $ratios = array_map(
+            static fn (mixed $ratio): float => max(0.45, min(0.78, (float) $ratio)),
+            $ratios,
+        );
+        $ratios = array_values(array_unique($ratios));
+
+        usort($ratios, static fn (float $a, float $b): int => abs($a - $primary) <=> abs($b - $primary));
+
+        return array_slice($ratios, 0, max(1, (int) config('passport.smart_scanner.max_mrz_candidates', 4)));
+    }
+
     private function run(array $arguments): bool
     {
         $binary = (string) config('passport.smart_scanner.imagemagick_binary', 'magick');
@@ -150,6 +194,7 @@ final class ImageMagickSmartPassportImageProcessor implements SmartPassportImage
                 'applied' => false,
                 'reason' => $reason,
             ],
+            mrzCandidatePaths: [$imagePath],
         );
     }
 }
