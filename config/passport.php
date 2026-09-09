@@ -62,6 +62,9 @@ return [
             explode(',', (string) env('CIVIL_REGISTRY_OCR_PSMS', '4,3,11')),
         ),
         'timeout' => (int) env('CIVIL_REGISTRY_OCR_TIMEOUT', 30),
+        'verification_enabled' => (bool) env('CIVIL_REGISTRY_VERIFICATION_ENABLED', true),
+        'verification_timeout' => (int) env('CIVIL_REGISTRY_VERIFICATION_TIMEOUT', 15),
+        'verification_max_dimension' => (int) env('CIVIL_REGISTRY_VERIFICATION_MAX_DIMENSION', 2200),
     ],
 
     'pdf' => [
