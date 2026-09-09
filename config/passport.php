@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'max_upload_kb' => (int) env('PASSPORT_MAX_UPLOAD_KB', 10240),
+    'max_upload_kb' => (int) env('PASSPORT_MAX_UPLOAD_KB', 30720),
     'temp_directory' => env('PASSPORT_TEMP_DIRECTORY', 'app/private/passport-tmp'),
 
     'ocr' => [
