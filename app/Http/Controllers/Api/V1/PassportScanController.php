@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Exceptions\LowQualityPassportImageException;
 use App\Exceptions\MrzNotDetectedException;
 use App\Exceptions\ScannerDependencyException;
 use App\Http\Controllers\Controller;
@@ -15,6 +16,12 @@ final class PassportScanController extends Controller
     {
         try {
             $result = $scanner->scan($request->file('passport'));
+        } catch (LowQualityPassportImageException $exception) {
+            return response()->json([
+                'message' => 'The passport image is too blurry or overexposed for reliable scanning.',
+                'code' => 'low_image_quality',
+                'quality' => $exception->quality(),
+            ], 422);
         } catch (MrzNotDetectedException $exception) {
             return response()->json([
                 'message' => 'A TD3 MRZ could not be confidently detected in this document.',
