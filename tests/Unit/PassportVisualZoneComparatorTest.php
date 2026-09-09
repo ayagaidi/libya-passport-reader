@@ -9,7 +9,7 @@ final class PassportVisualZoneComparatorTest extends TestCase
 {
     public function test_it_reports_consistent_comparable_fields_and_ignores_visual_only_fields(): void
     {
-        $comparator = new PassportVisualZoneComparator();
+        $comparator = new PassportVisualZoneComparator;
 
         $visual = [
             'surname' => ['value' => 'TESTER', 'language' => 'en', 'confidence' => 0.90],
@@ -43,7 +43,7 @@ final class PassportVisualZoneComparatorTest extends TestCase
 
     public function test_it_does_not_equate_arabic_names_with_mrz_transliteration(): void
     {
-        $comparator = new PassportVisualZoneComparator();
+        $comparator = new PassportVisualZoneComparator;
 
         $result = $comparator->compare([
             'surname' => ['value' => 'اختبار', 'language' => 'ar', 'confidence' => 0.90],
