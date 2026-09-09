@@ -10,5 +10,6 @@ final readonly class SmartPassportImage
         public array $temporaryPaths = [],
         public string $strategy = 'full_image_fallback',
         public array $preprocessing = [],
+        public array $mrzCandidatePaths = [],
     ) {}
 }
