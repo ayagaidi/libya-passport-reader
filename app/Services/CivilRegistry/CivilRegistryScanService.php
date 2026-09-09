@@ -5,7 +5,6 @@ namespace App\Services\CivilRegistry;
 use App\Services\Passport\PassportDocumentPreparer;
 use App\Services\Passport\TemporaryPassportFileManager;
 use App\Services\Passport\Vision\VisionPassportImageProcessorInterface;
-use App\Services\Passport\VisualZone\VisualZoneOcrEngineInterface;
 use Illuminate\Http\UploadedFile;
 
 final class CivilRegistryScanService
@@ -14,7 +13,7 @@ final class CivilRegistryScanService
         private readonly TemporaryPassportFileManager $temporaryFiles,
         private readonly PassportDocumentPreparer $documentPreparer,
         private readonly VisionPassportImageProcessorInterface $visionImageProcessor,
-        private readonly VisualZoneOcrEngineInterface $ocr,
+        private readonly CivilRegistryOcrEngine $ocr,
         private readonly CivilRegistryDocumentClassifier $classifier,
         private readonly CivilRegistryFieldExtractor $extractor,
     ) {}
@@ -59,6 +58,7 @@ final class CivilRegistryScanService
                     'source_type' => $mimeType === 'application/pdf' ? 'pdf' : 'image',
                     'ocr_engine' => $ocrResult->engine,
                     'ocr_confidence' => $ocrResult->confidence,
+                    'layout_candidates' => $ocrResult->metadata['layout_candidates'] ?? [],
                     'vision' => [
                         'strategy' => $visionImage->strategy,
                         'document_detected' => $visionImage->documentDetected,
