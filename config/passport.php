@@ -12,6 +12,14 @@ return [
         'timeout' => (int) env('PASSPORT_OCR_TIMEOUT', 20),
     ],
 
+    'visual_zone' => [
+        'enabled' => (bool) env('PASSPORT_VISUAL_ZONE_ENABLED', true),
+        'language' => env('PASSPORT_VISUAL_OCR_LANGUAGE', 'eng+ara'),
+        'fallback_language' => env('PASSPORT_VISUAL_OCR_FALLBACK_LANGUAGE', 'eng'),
+        'psm' => (int) env('PASSPORT_VISUAL_OCR_PSM', 6),
+        'timeout' => (int) env('PASSPORT_VISUAL_OCR_TIMEOUT', 20),
+    ],
+
     'pdf' => [
         'pdftoppm_binary' => env('PASSPORT_PDFTOPPM_BINARY', 'pdftoppm'),
         'dpi' => (int) env('PASSPORT_PDF_DPI', 300),

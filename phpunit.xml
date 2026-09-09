@@ -18,5 +18,6 @@
         <env name="SESSION_DRIVER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="LOG_CHANNEL" value="null"/>
+        <env name="PASSPORT_VISUAL_ZONE_ENABLED" value="false"/>
     </php>
 </phpunit>
