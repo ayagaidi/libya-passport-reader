@@ -3,8 +3,7 @@
 namespace App\Services\Passport;
 
 use App\Exceptions\ScannerDependencyException;
-use App\Services\Passport\Ocr\MrzTextExtractor;
-use App\Services\Passport\Ocr\OcrEngineInterface;
+use App\Services\Passport\SmartScanner\AdaptiveMrzScanner;
 use App\Services\Passport\SmartScanner\SmartPassportImageProcessorInterface;
 use App\Services\Passport\VisualZone\PassportVisualZoneComparator;
 use App\Services\Passport\VisualZone\VisualZoneFieldExtractor;
@@ -17,8 +16,7 @@ final class PassportScanService
         private readonly TemporaryPassportFileManager $temporaryFiles,
         private readonly PassportDocumentPreparer $documentPreparer,
         private readonly SmartPassportImageProcessorInterface $smartImageProcessor,
-        private readonly OcrEngineInterface $ocr,
-        private readonly MrzTextExtractor $mrzExtractor,
+        private readonly AdaptiveMrzScanner $adaptiveMrzScanner,
         private readonly MrzParserService $mrzParser,
         private readonly VisualZoneOcrEngineInterface $visualZoneOcr,
         private readonly VisualZoneFieldExtractor $visualZoneExtractor,
@@ -43,10 +41,12 @@ final class PassportScanService
 
             $smartImage = $this->smartImageProcessor->prepare($imagePath);
             $paths = array_merge($paths, $smartImage->temporaryPaths);
-
-            $ocrResult = $this->ocr->read($smartImage->mrzImagePath);
-            [$line1, $line2] = $this->mrzExtractor->extract($ocrResult->text);
-            $passport = $this->mrzParser->parse($line1, $line2);
+            $candidatePaths = $smartImage->mrzCandidatePaths !== []
+                ? $smartImage->mrzCandidatePaths
+                : [$smartImage->mrzImagePath];
+            $mrzScan = $this->adaptiveMrzScanner->scan($candidatePaths);
+            $ocrResult = $mrzScan['ocr_result'];
+            $passport = $this->mrzParser->parse($mrzScan['line1'], $mrzScan['line2']);
 
             $result = [
                 'passport' => $passport,
@@ -58,6 +58,13 @@ final class PassportScanService
                     'smart_scanner' => [
                         'strategy' => $smartImage->strategy,
                         'region_detection_applied' => $smartImage->strategy !== 'full_image_fallback',
+                        'adaptive_mrz' => [
+                            'enabled' => count($candidatePaths) > 1,
+                            'candidate_count' => $mrzScan['candidate_count'],
+                            'attempts' => $mrzScan['attempts'],
+                            'selected_candidate' => $mrzScan['candidate_index'],
+                            'detection_score' => $mrzScan['detection_score'],
+                        ],
                         'preprocessing' => $smartImage->preprocessing,
                     ],
                 ],
