@@ -13,12 +13,17 @@ Route::prefix('v1')->middleware([
 ])->group(function (): void {
     Route::get('/meta', fn () => response()->json([
         'name' => 'Libya Document Reader',
-        'version' => '0.4.2-dev',
-        'scope' => 'Production-hardened passport and Libyan Civil Registry Authority document scanning with bilingual OCR, structured extraction, conservative verification signals, API-key authentication, and per-client rate limiting',
+        'version' => '0.4.3-dev',
+        'scope' => 'Production-hardened passport and Libyan Civil Registry Authority document scanning with bilingual OCR, structured extraction, conservative verification signals, API-key authentication, private per-client limits, and protected public demo access',
         'security' => [
             'api_key_required' => (bool) config('document_api.enabled', false),
             'api_key_header' => (string) config('document_api.header', 'X-API-Key'),
-            'rate_limit_scope' => 'per API client',
+            'private_client_rate_limit_scope' => 'per API client',
+            'public_demo' => [
+                'enabled' => trim((string) config('document_api.public_demo_client_id', '')) !== '',
+                'rate_limit_scope' => 'per IP with shared global cap',
+                'global_rate_limit_per_minute' => (int) config('document_api.public_demo_global_rate_limit', 120),
+            ],
         ],
         'privacy' => [
             'stores_document_images' => false,
