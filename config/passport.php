@@ -55,6 +55,15 @@ return [
         'timeout' => (int) env('PASSPORT_VISUAL_OCR_TIMEOUT', 20),
     ],
 
+    'civil_registry' => [
+        'language' => env('CIVIL_REGISTRY_OCR_LANGUAGE', 'ara+eng'),
+        'psm_candidates' => array_map(
+            'intval',
+            explode(',', (string) env('CIVIL_REGISTRY_OCR_PSMS', '4,3,11')),
+        ),
+        'timeout' => (int) env('CIVIL_REGISTRY_OCR_TIMEOUT', 30),
+    ],
+
     'pdf' => [
         'pdftoppm_binary' => env('PASSPORT_PDFTOPPM_BINARY', 'pdftoppm'),
         'dpi' => (int) env('PASSPORT_PDF_DPI', 300),

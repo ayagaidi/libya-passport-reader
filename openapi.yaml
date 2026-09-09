@@ -1,9 +1,11 @@
 openapi: 3.1.0
 info:
-  title: Libya Passport Reader API
-  version: 0.3.3-dev
+  title: Libya Document Reader API
+  version: 0.4.0-dev
   description: |
-    Privacy-first API for OpenCV document detection and perspective correction, adaptive ICAO Doc 9303 TD3 MRZ candidate scoring and validation, Arabic/English visual-zone extraction, and conservative MRZ comparison.
+    Privacy-first API for Libyan passport and Civil Registry Authority document scanning. It combines OpenCV document detection and perspective correction, adaptive ICAO Doc 9303 TD3 MRZ validation, and Arabic/English OCR for structured civil-registry extraction.
+
+    Supported Civil Registry Authority documents currently include **Residence Certificate (شهادة الإقامة)** and **Family Status Certificate (شهادة بالوضع العائلي)**.
 
     **Developer:** Aya Aljaidi  
     **GitHub:** [github.com/ayagaidi](https://github.com/ayagaidi)  
@@ -16,7 +18,7 @@ info:
     github: https://github.com/ayagaidi
     linkedin: https://www.linkedin.com/in/aya-aljaidi-a9544b208/
 externalDocs:
-  description: Libya Passport Reader on GitHub
+  description: Libya Document Reader on GitHub
   url: https://github.com/ayagaidi/libya-passport-reader
 servers:
   - url: /
@@ -30,7 +32,7 @@ paths:
           description: Service is healthy
   /api/v1/meta:
     get:
-      summary: API metadata and privacy guarantees
+      summary: API metadata, supported documents, and privacy guarantees
       responses:
         '200':
           description: Metadata
@@ -56,6 +58,29 @@ paths:
           description: Invalid upload, severely low image quality, or TD3 MRZ not confidently detected in any scan candidate
         '503':
           description: Required local MRZ OCR or PDF-processing dependency unavailable
+  /api/v1/civil-registry/scan:
+    post:
+      summary: Detect a supported Libyan Civil Registry Authority document and extract structured Arabic/English fields
+      description: Supports Residence Certificate (شهادة الإقامة) and Family Status Certificate (شهادة بالوضع العائلي). Raw OCR text is not returned or persisted.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [document]
+              properties:
+                document:
+                  type: string
+                  format: binary
+                  description: JPEG, PNG, WebP, or PDF. Maximum size is deployment-configurable.
+      responses:
+        '200':
+          description: Classified civil-registry document, structured fields, family-member rows when detected, OCR confidence, vision metadata, and privacy metadata
+        '422':
+          description: Invalid upload or supported Civil Registry Authority document not confidently detected
+        '503':
+          description: Required local OCR or PDF-processing dependency unavailable
   /api/v1/passport/mrz/parse:
     post:
       summary: Parse a two-line TD3 MRZ
