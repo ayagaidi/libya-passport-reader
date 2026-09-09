@@ -98,7 +98,10 @@ final class PassportScanService
             ];
         }
 
-        $fields = $this->visualZoneExtractor->extract($ocrResult->text);
+        $fields = $this->visualZoneExtractor->extract(
+            $ocrResult->text,
+            $ocrResult->metadata['lines'] ?? [],
+        );
         $comparison = $this->visualZoneComparator->compare($fields, $mrzData);
         $visualOnlyFields = array_intersect_key(
             $fields,
