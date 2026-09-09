@@ -2,7 +2,22 @@ openapi: 3.1.0
 info:
   title: Libya Passport Reader API
   version: 0.3.3-dev
-  description: Privacy-first API for OpenCV document detection and perspective correction, adaptive ICAO Doc 9303 TD3 MRZ candidate scoring and validation, Arabic/English visual-zone extraction, and conservative MRZ comparison.
+  description: |
+    Privacy-first API for OpenCV document detection and perspective correction, adaptive ICAO Doc 9303 TD3 MRZ candidate scoring and validation, Arabic/English visual-zone extraction, and conservative MRZ comparison.
+
+    **Developer:** Aya Aljaidi  
+    **GitHub:** [github.com/ayagaidi](https://github.com/ayagaidi)  
+    **LinkedIn:** [Aya Aljaidi](https://www.linkedin.com/in/aya-aljaidi-a9544b208/)
+  contact:
+    name: Aya Aljaidi
+    url: https://www.linkedin.com/in/aya-aljaidi-a9544b208/
+  x-developer:
+    name: Aya Aljaidi
+    github: https://github.com/ayagaidi
+    linkedin: https://www.linkedin.com/in/aya-aljaidi-a9544b208/
+externalDocs:
+  description: Libya Passport Reader on GitHub
+  url: https://github.com/ayagaidi/libya-passport-reader
 servers:
   - url: /
     description: Current host
