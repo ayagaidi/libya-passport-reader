@@ -38,6 +38,7 @@ final class PassportVisualZoneComparator
                     'status' => 'not_detected',
                     'match' => null,
                 ];
+
                 continue;
             }
 
@@ -48,6 +49,7 @@ final class PassportVisualZoneComparator
                     'visual_value' => $visual['value'],
                     'confidence' => $visual['confidence'] ?? null,
                 ];
+
                 continue;
             }
 
@@ -60,6 +62,7 @@ final class PassportVisualZoneComparator
                     'mrz_value' => $mrzValue,
                     'confidence' => $visual['confidence'] ?? null,
                 ];
+
                 continue;
             }
 
